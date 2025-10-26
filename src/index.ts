@@ -7,6 +7,7 @@ import * as yaml from 'js-yaml';
 import { validateWorkflowSchema, runWorkflow } from './lib/workflow';
 import { checkMiseInstallation } from './lib/tools';
 import { createWorkflowContext } from './lib/context';
+import packageJson from '../package.json';
 
 async function processWorkflowFile(workflowFile: string, isDryRun: boolean = false): Promise<void> {
     // Check mise installation and print version
@@ -100,7 +101,7 @@ const program = new Command();
 program
     .name('lacky')
     .description('A CLI tool to run a GitHub Actions Workflow locally')
-    .version('1.0.0')
+    .version(packageJson.version)
     .argument('<workflow-file>', 'Path to the GitHub workflow YAML file')
     .option('-d, --dry-run', 'Show what commands would be executed without running them (preview)')
     .action(async (workflowFile, options) => {
