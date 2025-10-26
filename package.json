@@ -1,5 +1,5 @@
 {
-  "name": "lacky",
+  "name": "@codecapers/lacky",
   "version": "0.0.1",
   "description": "A CLI tool to run a GitHub Actions Workflow locally",
   "main": "dist/index.js",
@@ -13,8 +13,9 @@
     "test:coverage": "jest --coverage"
   },
   "keywords": [
-    "cli",
-    "workflow"
+    "github",
+    "workflow",
+    "actions"
   ],
   "author": "ashley@codecapers.com.au",
   "license": "MIT",
