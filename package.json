@@ -1,6 +1,6 @@
 {
   "name": "@codecapers/lacky",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "A CLI tool to run a GitHub Actions Workflow locally",
   "main": "dist/index.js",
   "scripts": {
