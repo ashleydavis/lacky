@@ -29,6 +29,20 @@ export async function evaluateJobCondition(condition: string, workflow: Workflow
         }
     }
     
+    // Replace needs.job.result references
+    const needsResultMatches = condition.match(/needs\.([^.]+)\.result/g);
+    if (needsResultMatches) {
+        for (const match of needsResultMatches) {
+            const needsMatch = match.match(/needs\.([^.]+)\.result/);
+            if (needsMatch) {
+                const [, jobName] = needsMatch;
+                // For now, assume all completed jobs succeeded
+                // In a real implementation, we'd track job results
+                resolvedCondition = resolvedCondition.replace(match, `"success"`);
+            }
+        }
+    }
+    
     // Replace other GitHub expressions
     const githubExpressions = extractGitHubExpressions(resolvedCondition);
     for (const expression of githubExpressions) {
@@ -36,6 +50,12 @@ export async function evaluateJobCondition(condition: string, workflow: Workflow
         const placeholder = '${{ ' + expression + ' }}';
         resolvedCondition = resolvedCondition.replace(placeholder, `"${value}"`);
     }
+    
+    // Define GitHub Actions workflow functions
+    const always = () => true;
+    const success = () => true;
+    const failure = () => false;
+    const cancelled = () => false;
     
     // Evaluate the resolved condition as a JavaScript expression
     try {
@@ -84,6 +104,12 @@ export async function evaluateStepCondition(condition: string, workflow: Workflo
         const placeholder = '${{ ' + expression + ' }}';
         resolvedCondition = resolvedCondition.replace(placeholder, `"${value}"`);
     }
+    
+    // Define GitHub Actions workflow functions
+    const always = () => true;
+    const success = () => true;
+    const failure = () => false;
+    const cancelled = () => false;
     
     // Evaluate the resolved condition as a JavaScript expression
     try {

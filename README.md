@@ -20,7 +20,12 @@ A CLI tool to run a GitHub Actions Workflow locally.
    - Menu-based selection for known variables (e.g., `github.ref_type` offers "branch" or "tag")
    - Free-text input for custom variables and inputs
    - Caches resolved values to avoid repeated prompts
-5. **Mock Actions**: Supports custom mock actions for testing workflows locally
+5. **Workflow Functions Support**: Supports GitHub Actions workflow expression functions:
+   - `always()` - Always returns true (runs job/step regardless of previous results)
+   - `success()` - Returns true (assumes previous steps/jobs succeeded)
+   - `failure()` - Returns false (for testing failure conditions)
+   - `cancelled()` - Returns false (for testing cancellation conditions)
+6. **Mock Actions**: Supports custom mock actions for testing workflows locally
 
 ## Installation
 
