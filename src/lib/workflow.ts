@@ -267,22 +267,24 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                                     ...jobEnvVars,
                                     GITHUB_OUTPUT: githubOutputFile,
                                 };
-                                const result = await executeCommand(resolvedCommand, stepWorkingDir, true, envVars, context.miseVersion);
+                                const result = await executeCommand(resolvedCommand, stepWorkingDir, false, envVars, context.miseVersion);
                                 
                                 if (result.success) {
                                     spinner.succeed(`\x1b[32mExit code: \x1b[32m${result.exitCode}\x1b[0m`);
                                 } 
                                 else {
                                     spinner.fail(`\x1b[31mExit code: \x1b[31m${result.exitCode}\x1b[0m`);
+                                }
 
-                                    // Display output only when command fails
-                                    if (result.output) {
-                                        console.log(`      \x1b[37m${result.output}\x1b[0m`);
-                                    }
-                                    if (result.error) {
-                                        console.log(`      \x1b[31m${result.error}\x1b[0m`);
-                                    }
+                                // Print output after spinner has stopped
+                                if (result.output) {
+                                    process.stdout.write(`\x1b[90m${result.output}\x1b[0m`);
+                                }
+                                if (result.error) {
+                                    process.stderr.write(`\x1b[90m${result.error}\x1b[0m`);
+                                }
 
+                                if (!result.success) {
                                     // Ask if user wants to continue after failure
                                     let shouldContinue: 'yes' | 'no' | 'all' | 'quit' | 'skip';
                                     if (runAllMode) {
