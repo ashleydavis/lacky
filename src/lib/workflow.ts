@@ -117,23 +117,23 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
         console.log(`\n\x1b[97mRunning job: ${jobDisplayName}\x1b[0m`);
 
         if (job['runs-on']) {
-            console.log(`  Runs on: ${job['runs-on']}`);
+            console.log(`\x1b[96mRuns on: ${job['runs-on']}\x1b[0m`);
         }
 
         if (matrixValue) {
-            console.log(`  Matrix: ${JSON.stringify(matrixValue)}`);
+            console.log(`\x1b[96mMatrix: ${JSON.stringify(matrixValue)}\x1b[0m`);
         }
 
         // Ask user if they want to run this job
         const runJobResponse = await askUserConfirmation(`Do you want to run job '${jobDisplayName}'?`);
         
         if (runJobResponse === 'no' || runJobResponse === 'skip') {
-            console.log(`  ⏭  Skipping job (user chose not to run)`);
+            console.log(`\x1b[96m⏭  Skipping job (user chose not to run)\x1b[0m`);
             return;
         }
         
         if (runJobResponse === 'quit') {
-            console.log(`  🛑 Quitting workflow execution`);
+            console.log(`\x1b[96m🛑 Quitting workflow execution\x1b[0m`);
             throw new Error('Workflow execution stopped by user');
         }
 
@@ -141,7 +141,7 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
         if (job.if) {
             const conditionMet = await evaluateJobCondition(job.if, workflow, context);
             if (!conditionMet) {
-                console.log(`  ⏭  Skipping job (condition not met: ${job.if})`);
+                console.log(`\x1b[96m⏭  Skipping job (condition not met: ${job.if})\x1b[0m`);
                 return;
             }
         }
@@ -149,7 +149,7 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
         // Resolve job-level environment variables for this matrix instance
         const jobEnvVars: { [key: string]: string } = {};
         if (job.env) {
-            console.log(`  \x1b[36m[ENV]\x1b[0m`);
+            console.log(`\x1b[96m[ENV]\x1b[0m`);
             for (const [key, value] of Object.entries(job.env)) {
                 if (typeof value === 'string') {
                     // Resolve any GitHub expressions in the env value, including matrix variables
@@ -172,7 +172,7 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                     }
                     
                     jobEnvVars[key] = resolvedValue;
-                    console.log(`    ${key} = "${resolvedValue}"`);
+                    console.log(`\x1b[96m${key} = "${resolvedValue}"\x1b[0m`);
                 } else {
                     jobEnvVars[key] = String(value);
                 }
@@ -180,7 +180,7 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
         }
 
         if (job.steps && Array.isArray(job.steps)) {
-            console.log(`  \x1b[97mSteps (${job.steps.length}):\x1b[0m`);
+            console.log(`\x1b[96mSteps (${job.steps.length}):\x1b[0m`);
 
             // Get job-level defaults
             const jobDefaults = job.defaults || {};
@@ -195,13 +195,13 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                 // Generate step ID for step outputs
                 const stepId = step.id || stepName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
-                console.log(`    \x1b[97m${i + 1}. ${stepName} (${stepUses})\x1b[0m`);
+                console.log(`\x1b[37m${i + 1}. ${stepName} (${stepUses})\x1b[0m`);
 
                 // Check step condition
                 if (step.if) {
                     const conditionMet = await evaluateStepCondition(step.if, workflow, jobName, context);
                     if (!conditionMet) {
-                        console.log(`      ⏭  Skipping step (condition not met: ${step.if})`);
+                        console.log(`\x1b[90m⏭  Skipping step (condition not met: ${step.if})\x1b[0m`);
                         continue;
                     }
                 }
@@ -224,13 +224,13 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                     let resolvedCommand = await resolveVariablesInCommand(step.run, workflow, stepId, jobName, context, matrixValue);
 
                     if (isDryRun) {
-                        console.log(`      [PREVIEW] Would execute: ${resolvedCommand} (in ${stepWorkingDir})`);
+                        console.log(`\x1b[90m[PREVIEW] Would execute: ${resolvedCommand} (in ${stepWorkingDir})\x1b[0m`);
                     } 
                     else {
                         // Ask user for confirmation before running the command
-                        console.log(`\n      🔧 COMMAND CONFIRMATION`);
-                        console.log(`      Command:   \x1b[36m${resolvedCommand}\x1b[0m`);
-                        console.log(`      Directory: \x1b[35m${stepWorkingDir}\x1b[0m`);
+                        console.log(`\n\x1b[90m🔧 COMMAND CONFIRMATION\x1b[0m`);
+                        console.log(`\x1b[90mCommand:   \x1b[36m${resolvedCommand}\x1b[0m`);
+                        console.log(`\x1b[90mDirectory: \x1b[35m${stepWorkingDir}\x1b[0m`);
 
                         let shouldRun: 'yes' | 'no' | 'all' | 'quit' | 'skip';
 
@@ -238,21 +238,21 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                             shouldRun = 'yes';
                         } 
                         else {
-                            shouldRun = await askUserConfirmation(`      \x1b[1mDo you want to run this command?\x1b[0m`);
+                            shouldRun = await askUserConfirmation(`\x1b[1mDo you want to run this command?\x1b[0m`);
                         }
 
                         if (shouldRun === 'quit') {
-                            console.log(`      \x1b[31m[QUIT] Exiting workflow...\x1b[0m`);
+                            console.log(`\x1b[31m[QUIT] Exiting workflow...\x1b[0m`);
                             return;
                         }
 
                         if (shouldRun === 'skip') {
-                            console.log(`      ⏭  Skipping command`);
+                            console.log(`\x1b[90m⏭  Skipping command\x1b[0m`);
                         } 
                         else if (shouldRun === 'yes' || shouldRun === 'all') {
                             if (shouldRun === 'all') {
                                 runAllMode = true;
-                                console.log(`      \x1b[33m[RUN ALL MODE ACTIVATED] Will auto-execute all remaining commands\x1b[0m`);
+                                console.log(`\x1b[33m[RUN ALL MODE ACTIVATED] Will auto-execute all remaining commands\x1b[0m`);
                             }
 
                             // Start animated progress indicator
@@ -289,17 +289,17 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                                     let shouldContinue: 'yes' | 'no' | 'all' | 'quit' | 'skip';
                                     if (runAllMode) {
                                         shouldContinue = 'yes';
-                                        console.log(`      \x1b[32m[RUN ALL MODE] Continuing despite failure...\x1b[0m`);
+                                        console.log(`\x1b[32m[RUN ALL MODE] Continuing despite failure...\x1b[0m`);
                                     } 
                                     else {
-                                        shouldContinue = await askUserConfirmation(`      Do you want to continue with the next step?`);
+                                        shouldContinue = await askUserConfirmation(`Do you want to continue with the next step?`);
                                     }
                                     if (shouldContinue === 'quit') {
-                                        console.log(`      \x1b[31m[QUIT] Exiting workflow...\x1b[0m`);
+                                        console.log(`\x1b[31m[QUIT] Exiting workflow...\x1b[0m`);
                                         return;
                                     }
                                     if (shouldContinue === 'no') {
-                                        console.log(`      Stopping workflow execution`);
+                                        console.log(`\x1b[90mStopping workflow execution\x1b[0m`);
                                         return;
                                     }
                                 }
@@ -316,7 +316,7 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                                     
                                     for (const [key, value] of githubOutputs) {
                                         context.stepOutputs.get(jobName)!.get(stepId)!.set(key, value);
-                                        console.log(`      [OUTPUT] ${key} = "${value}"`);
+                                        console.log(`\x1b[90m[OUTPUT] ${key} = "${value}"\x1b[0m`);
                                     }
                                 }
                                 
@@ -330,7 +330,7 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                             }
                         } 
                         else {
-                            console.log(`      ⏭  Skipping command`);
+                            console.log(`\x1b[90m⏭  Skipping command\x1b[0m`);
                         }
                     }
                 } 
@@ -349,7 +349,7 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                     } 
                     else if (step.uses && step.uses.startsWith('actions/checkout')) {
                         // Skip actions/checkout - repo is expected to be already checked out
-                        console.log(`      ⏭  Skipping ${step.uses} (repo already checked out)`);
+                        console.log(`\x1b[90m⏭  Skipping ${step.uses} (repo already checked out)\x1b[0m`);
                     }
                     else if (step.uses) {
                         // Handle any other action (custom or built-in) - let the mock system determine if a mock exists
@@ -365,10 +365,10 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                     }
                     else {
                         if (isDryRun) {
-                            console.log(`      [PREVIEW] Would run ${stepUses} step`);
+                            console.log(`\x1b[90m[PREVIEW] Would run ${stepUses} step\x1b[0m`);
                         } 
                         else {
-                            console.log(`      Running ${stepUses} step...`);
+                            console.log(`\x1b[90mRunning ${stepUses} step...\x1b[0m`);
                             await new Promise(resolve => setTimeout(resolve, 500));
                         }
                     }
@@ -386,15 +386,15 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                 context.jobOutputs.set(jobName, new Map());
             }
             
-            console.log(`  \x1b[36m[OUTPUTS]\x1b[0m`);
+            console.log(`\x1b[96m[OUTPUTS]\x1b[0m`);
             for (const [outputName, outputExpression] of Object.entries(job.outputs)) {
                 const outputValue = await resolveJobOutputExpression(outputExpression as string, jobName, workflow, context);
                 context.jobOutputs.get(jobName)!.set(outputName, outputValue);
-                console.log(`    ${outputName} = "${outputValue}"`);
+                console.log(`\x1b[96m${outputName} = "${outputValue}"\x1b[0m`);
             }
         }
 
-        console.log(`  \x1b[32m✓\x1b[0m Job '${jobDisplayName}' completed`);
+        console.log(`\x1b[32m✓ Job '${jobDisplayName}' completed\x1b[0m`);
     };
 
     // Main job execution loop with dependency resolution
@@ -455,10 +455,10 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                 generateCombinations(matrixKeys, 0, {});
 
                 // Display matrix combinations
-                console.log(`  \x1b[36m[MATRIX]\x1b[0m`);
-                console.log(`  Matrix combinations (${matrixValues.length}):`);
+                console.log(`\x1b[96m[MATRIX]\x1b[0m`);
+                console.log(`\x1b[96mMatrix combinations (${matrixValues.length}):\x1b[0m`);
                 for (let i = 0; i < matrixValues.length; i++) {
-                    console.log(`    ${i + 1}. ${JSON.stringify(matrixValues[i])}`);
+                    console.log(`\x1b[96m${i + 1}. ${JSON.stringify(matrixValues[i])}\x1b[0m`);
                 }
                 console.log('');
 
