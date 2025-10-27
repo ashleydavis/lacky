@@ -159,7 +159,7 @@ describe('handleTerraformSetup', () => {
         });
 
         const workflow = { on: { push: {} }, jobs: {} };
-        await expect(handleTerraformSetup(step, false, workflow, '/test/dir', 'test-job', createWorkflowContext(null))).rejects.toThrow('process.exit called with code: 1');
+        await expect(handleTerraformSetup(step, false, workflow, '/test/dir', 'test-job', createWorkflowContext(null))).rejects.toThrow('Failed to get local Terraform version: terraform: command not found');
     });
 
     it('should handle version mismatch in setup', async () => {
@@ -181,7 +181,7 @@ describe('handleTerraformSetup', () => {
         });
 
         const workflow = { on: { push: {} }, jobs: {} };
-        await expect(handleTerraformSetup(step, false, workflow, '/test/dir', 'test-job', createWorkflowContext(null))).rejects.toThrow('process.exit called with code: 1');
+        await expect(handleTerraformSetup(step, false, workflow, '/test/dir', 'test-job', createWorkflowContext(null))).rejects.toThrow('Terraform version mismatch! Required: 1.5.0, Local: 1.4.0');
     });
 
     it('should handle JSON parsing errors', async () => {
@@ -199,7 +199,7 @@ describe('handleTerraformSetup', () => {
         });
 
         const workflow = { on: { push: {} }, jobs: {} };
-        await expect(handleTerraformSetup(step, false, workflow, '/test/dir', 'test-job', createWorkflowContext(null))).rejects.toThrow('process.exit called with code: 1');
+        await expect(handleTerraformSetup(step, false, workflow, '/test/dir', 'test-job', createWorkflowContext(null))).rejects.toThrow();
     });
 
     it('should handle missing terraform_version field in JSON', async () => {
@@ -221,7 +221,7 @@ describe('handleTerraformSetup', () => {
         });
 
         const workflow = { on: { push: {} }, jobs: {} };
-        await expect(handleTerraformSetup(step, false, workflow, '/test/dir', 'test-job', createWorkflowContext(null))).rejects.toThrow('process.exit called with code: 1');
+        await expect(handleTerraformSetup(step, false, workflow, '/test/dir', 'test-job', createWorkflowContext(null))).rejects.toThrow();
     });
 
     it('should use process.cwd() as default working directory', async () => {

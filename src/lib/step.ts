@@ -13,7 +13,7 @@ export async function checkTerraformVersion(resolvedVersion: string, terraformWo
     if (!result.success) {
         console.log(`      ✖ Failed to get local Terraform version: ${result.error}`);
         console.log(`      Please ensure Terraform is installed and available in PATH`);
-        process.exit(1);
+        throw new Error(`Failed to get local Terraform version: ${result.error}`);
     }
 
     // Parse the JSON output to get version
@@ -31,7 +31,7 @@ export async function checkTerraformVersion(resolvedVersion: string, terraformWo
         console.log(`      Required: ${resolvedVersion}`);
         console.log(`      Local: ${localVersion}`);
         console.log(`      Please install the correct Terraform version or update the workflow`);
-        process.exit(1);
+        throw new Error(`Terraform version mismatch! Required: ${resolvedVersion}, Local: ${localVersion}`);
     }
 
     console.log(`      \x1b[32m✓\x1b[0m Terraform version matches (${localVersion})`);
@@ -68,7 +68,7 @@ export async function handleTerraformSetup(step: Step, isDryRun: boolean, workfl
     } 
     catch (error: any) {
         console.log(`      ✖ Error checking Terraform version: ${error.message}`);
-        process.exit(1);
+        throw error;
     }
 }
 
