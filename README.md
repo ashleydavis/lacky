@@ -16,7 +16,11 @@ A CLI tool to run a GitHub Actions Workflow locally.
    - Displaying job details (runs-on, steps)
    - Simulating step execution with timing
    - Showing step names and types
-4. **Mock Actions**: Supports custom mock actions for testing workflows locally
+4. **Interactive Variable Resolution**: Prompts for GitHub context variables with smart defaults:
+   - Menu-based selection for known variables (e.g., `github.ref_type` offers "branch" or "tag")
+   - Free-text input for custom variables and inputs
+   - Caches resolved values to avoid repeated prompts
+5. **Mock Actions**: Supports custom mock actions for testing workflows locally
 
 ## Installation
 
@@ -125,6 +129,56 @@ bun run test:watch
 # Type check
 bun run compile
 ```
+
+## Interactive Variable Resolution
+
+When lacky encounters GitHub context variables in your workflow (like `${{ github.ref_type }}`), it will interactively prompt you for values using Inquirer for an enhanced user experience. For known variables with specific valid options, lacky presents an interactive menu to choose from:
+
+### Menu-Based Variables
+
+The following variables offer interactive menu-based selection:
+
+- **`github.ref_type`**: Choose between "branch" or "tag"
+- **`github.event_name`**: Choose from common event types like "push", "pull_request", "workflow_dispatch", etc.
+
+Example interaction:
+```
+? Select value for 'github.ref_type': (Use arrow keys)
+❯ branch
+  tag
+
+      🔧 Resolved github.ref_type = "branch"
+```
+
+### Free-Text Input Variables
+
+Other variables will prompt for free-text input with helpful placeholders:
+- **`github.ref_name`**: Branch or tag name (e.g., `main`)
+- **`github.sha`**: Commit SHA (e.g., `abc123def456`)
+- **`github.workspace`**: Workspace path (e.g., `/home/runner/work/repo/repo`)
+- **`github.event.inputs.*`**: Workflow dispatch inputs (e.g., `my-value`)
+- **`env.*`**: Environment variables (e.g., `value`)
+
+Example interaction:
+```
+? Enter branch/tag name (main)
+```
+
+Press Enter to use the default placeholder value, or type your own value.
+
+### Variable Caching
+
+Once you provide a value for a variable, lacky caches it for the duration of the workflow execution. This means you won't be prompted multiple times for the same variable.
+
+### Try It Out
+
+You can test the interactive variable resolution with the included example workflow:
+
+```bash
+lacky examples/example-workflow.yml
+```
+
+This will prompt you to select values for `github.ref_type` and `github.event_name`, demonstrating the menu-based selection feature.
 
 ## Mock Actions
 
