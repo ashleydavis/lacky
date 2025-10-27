@@ -1,0 +1,30 @@
+name: Example Workflow with Interactive Variables
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  example-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show ref type
+        run: |
+          echo "Reference type: ${{ github.ref_type }}"
+          echo "Reference name: ${{ github.ref_name }}"
+          
+      - name: Show event name
+        run: |
+          echo "Event that triggered: ${{ github.event_name }}"
+          
+      - name: Conditional based on ref type
+        if: ${{ github.ref_type == 'tag' }}
+        run: |
+          echo "This is a tagged release!"
+          
+      - name: Conditional based on ref type (branch)
+        if: ${{ github.ref_type == 'branch' }}
+        run: |
+          echo "This is a branch push!"
+

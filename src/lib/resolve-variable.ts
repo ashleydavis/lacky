@@ -1,6 +1,12 @@
 import { Workflow } from '../types/workflow';
-import { askUserForInput } from './input';
+import { askUserForInput, askUserToSelectFromMenu } from './input';
 import { WorkflowContext } from './context';
+
+// Define known GitHub context variables with their valid options
+const GITHUB_CONTEXT_OPTIONS: Record<string, string[]> = {
+    'github.ref_type': ['branch', 'tag'],
+    'github.event_name': ['push', 'pull_request', 'workflow_dispatch', 'schedule', 'release', 'create', 'delete'],
+};
 
 export function extractGitHubExpressions(text: string): string[] {
     const expressionRegex = /\$\{\{\s*([^}]+)\s*\}\}/g;
@@ -20,10 +26,21 @@ export async function resolveGitHubExpression(expression: string, workflow: Work
         return context.resolvedVariables.get(expression)!;
     }
 
+    // Check if this is a known GitHub context variable with predefined options
+    if (GITHUB_CONTEXT_OPTIONS[expression]) {
+        const value = await askUserToSelectFromMenu(
+            `Select value for '${expression}':`,
+            GITHUB_CONTEXT_OPTIONS[expression]
+        );
+        context.resolvedVariables.set(expression, value);
+        console.log(`      🔧 Resolved ${expression} = "${value}"`);
+        return value;
+    }
+
     // Handle different types of expressions
     if (expression.startsWith('github.event.inputs.')) {
         const inputName = expression.replace('github.event.inputs.', '');
-        const value = await askUserForInput(`Enter value for input '${inputName}': `);
+        const value = await askUserForInput(`Enter value for input '${inputName}'`, 'my-value');
         context.resolvedVariables.set(expression, value);
         console.log(`      🔧 Resolved ${expression} = "${value}"`);
         return value;
@@ -41,28 +58,28 @@ export async function resolveGitHubExpression(expression: string, workflow: Work
         }
 
         // If not in workflow, ask user
-        const value = await askUserForInput(`Enter value for environment variable '${envVarName}': `);
+        const value = await askUserForInput(`Enter value for environment variable '${envVarName}'`, 'value');
         context.resolvedVariables.set(expression, value);
         console.log(`      🔧 Resolved ${expression} = "${value}"`);
         return value;
     }
 
     if (expression.startsWith('github.ref_name')) {
-        const value = await askUserForInput('Enter branch/tag name (github.ref_name): ');
+        const value = await askUserForInput('Enter branch/tag name', 'main');
         context.resolvedVariables.set(expression, value);
         console.log(`      🔧 Resolved ${expression} = "${value}"`);
         return value;
     }
 
     if (expression.startsWith('github.sha')) {
-        const value = await askUserForInput('Enter commit SHA (github.sha): ');
+        const value = await askUserForInput('Enter commit SHA', 'abc123def456');
         context.resolvedVariables.set(expression, value);
         console.log(`      🔧 Resolved ${expression} = "${value}"`);
         return value;
     }
 
     if (expression.startsWith('github.workspace')) {
-        const value = await askUserForInput('Enter workspace path (github.workspace): ');
+        const value = await askUserForInput('Enter workspace path', '/home/runner/work/repo/repo');
         context.resolvedVariables.set(expression, value);
         console.log(`      🔧 Resolved ${expression} = "${value}"`);
         return value;
@@ -96,7 +113,7 @@ export async function resolveGitHubExpression(expression: string, workflow: Work
                 return value;
             }
             // If job output not found, ask user
-            const value = await askUserForInput(`Enter value for job output '${expression}': `);
+            const value = await askUserForInput(`Enter value for job output '${expression}'`, 'output-value');
             context.resolvedVariables.set(expression, value);
             console.log(`      🔧 Resolved ${expression} = "${value}"`);
             return value;
@@ -104,7 +121,7 @@ export async function resolveGitHubExpression(expression: string, workflow: Work
     }
 
     // For other expressions, ask the user
-    const value = await askUserForInput(`Enter value for '${expression}': `);
+    const value = await askUserForInput(`Enter value for '${expression}'`, 'value');
     context.resolvedVariables.set(expression, value);
     console.log(`      🔧 Resolved ${expression} = "${value}"`);
     return value;
@@ -127,7 +144,7 @@ export async function resolveVariablesInCommand(command: string, workflow: Workf
                 value = String(matrixValue[matrixKey]);
                 console.log(`      🔧 Resolved ${expression} = "${value}"`);
             } else {
-                value = await askUserForInput(`Enter value for matrix variable '${expression}': `);
+                value = await askUserForInput(`Enter value for matrix variable '${expression}'`, 'matrix-value');
             }
         }
         // Check if this is a step output reference (e.g., steps.changed-files.outputs.all_changed_files)
@@ -154,7 +171,7 @@ export async function resolveStepOutput(expression: string, currentStepId: strin
     // Parse step output reference: steps.step-id.outputs.output-name
     const match = expression.match(/^steps\.([^.]+)\.outputs\.(.+)$/);
     if (!match) {
-        return await askUserForInput(`Enter value for step output '${expression}': `);
+        return await askUserForInput(`Enter value for step output '${expression}'`, 'output-value');
     }
     
     const [, stepId, outputName] = match;
@@ -167,7 +184,7 @@ export async function resolveStepOutput(expression: string, currentStepId: strin
     }
     
     // If not found, ask user for the value
-    return await askUserForInput(`Enter value for step output '${expression}': `);
+    return await askUserForInput(`Enter value for step output '${expression}'`, 'output-value');
 }
 
 export async function resolveJobOutputExpression(expression: string, jobName: string, workflow: Workflow, context: WorkflowContext): Promise<string> {
@@ -189,7 +206,7 @@ export async function resolveJobOutputExpression(expression: string, jobName: st
         }
         
         // If not found, ask user for the value
-        return await askUserForInput(`Enter value for step output '${expression}': `);
+        return await askUserForInput(`Enter value for step output '${expression}'`, 'output-value');
     }
     
     // For other expressions, use the regular GitHub expression resolver

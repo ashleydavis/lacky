@@ -1,18 +1,21 @@
 import * as readline from 'readline';
 import ora from 'ora';
+import inquirer from 'inquirer';
 
-export async function askUserForInput(prompt: string): Promise<string> {
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-    });
-
-    return new Promise((resolve) => {
-        rl.question(prompt, (answer) => {
-            rl.close();
-            resolve(answer.trim());
-        });
-    });
+export async function askUserForInput(prompt: string, placeholder?: string): Promise<string> {
+    // Add blank line before prompt for better readability
+    console.log();
+    
+    const answer = await inquirer.prompt([
+        {
+            type: 'input',
+            name: 'value',
+            message: prompt,
+            default: placeholder,
+        }
+    ]);
+    
+    return answer.value.trim();
 }
 
 export function askUserConfirmation(question: string): Promise<'yes' | 'no' | 'all' | 'quit' | 'skip'> {
@@ -51,4 +54,20 @@ export function createSpinner() {
         spinner: 'dots',
         indent: 6
     });
+}
+
+export async function askUserToSelectFromMenu(prompt: string, options: string[]): Promise<string> {
+    // Add blank line before prompt for better readability
+    console.log();
+    
+    const answer = await inquirer.prompt([
+        {
+            type: 'list',
+            name: 'selection',
+            message: prompt,
+            choices: options,
+        }
+    ]);
+    
+    return answer.selection;
 }
