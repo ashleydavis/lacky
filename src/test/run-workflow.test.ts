@@ -40,6 +40,11 @@ global.console = {
 describe('runWorkflow', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockExecuteCommand.mockReset();
+        mockAskUserConfirmation.mockReset();
+        mockAskUserForInput.mockReset();
+        // Default mock return values - 'yes' to run jobs by default
+        mockAskUserConfirmation.mockResolvedValue('yes');
         // Clear the resolved variables cache
     });
 
@@ -347,10 +352,10 @@ describe('runWorkflow', () => {
         await expect(runWorkflow(workflowWithOn2, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
         expect(mockExecuteCommand).not.toHaveBeenCalled();
 
-        // Test 'quit' response
+        // Test 'quit' response - should throw error
         mockAskUserConfirmation.mockResolvedValueOnce('quit');
         const workflowWithOn3 = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn3, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn3, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).rejects.toThrow('Workflow execution stopped by user');
         expect(mockExecuteCommand).not.toHaveBeenCalled();
     });
 
@@ -601,7 +606,9 @@ describe('runWorkflow', () => {
             }
         };
 
-        mockAskUserConfirmation.mockResolvedValueOnce('yes');
+        mockAskUserConfirmation
+            .mockResolvedValueOnce('yes') // Job confirmation
+            .mockResolvedValueOnce('yes'); // Command confirmation
         mockExecuteCommand.mockRejectedValueOnce(new Error('Command execution failed'));
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
