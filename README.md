@@ -11,21 +11,31 @@ A CLI tool to run a GitHub Actions Workflow locally.
    - Triggers (on events)
    - Jobs defined
    - Warnings for missing elements
-3. **Simulation**: Simulates the workflow execution by:
+3. **Interactive Job Selection**: Prompts before running each job (y/n/a/q/s):
+   - Choose whether to run or skip individual jobs
+   - Run all remaining jobs without prompting (a)
+   - Quit workflow execution at any time (q)
+   - Helpful for debugging specific jobs in complex workflows
+   - Conditions are still evaluated (jobs may be skipped if conditions aren't met)
+4. **Simulation**: Simulates the workflow execution by:
    - Running each job sequentially
    - Displaying job details (runs-on, steps)
    - Simulating step execution with timing
    - Showing step names and types
-4. **Interactive Variable Resolution**: Prompts for GitHub context variables with smart defaults:
+5. **Interactive Variable Resolution**: Prompts for GitHub context variables with smart defaults:
    - Menu-based selection for known variables (e.g., `github.ref_type` offers "branch" or "tag")
    - Free-text input for custom variables and inputs
    - Caches resolved values to avoid repeated prompts
-5. **Workflow Functions Support**: Supports GitHub Actions workflow expression functions:
+6. **Workflow Functions Support**: Supports GitHub Actions workflow expression functions:
    - `always()` - Always returns true (runs job/step regardless of previous results)
    - `success()` - Returns true (assumes previous steps/jobs succeeded)
    - `failure()` - Returns false (for testing failure conditions)
    - `cancelled()` - Returns false (for testing cancellation conditions)
-6. **Mock Actions**: Supports custom mock actions for testing workflows locally
+7. **Tool Version Management with mise**: Automatically detects and uses mise for environment management:
+   - Runs workflow commands with the correct tool versions from `.mise.toml` or `.tool-versions`
+   - Seamlessly integrates with your existing mise configuration
+   - Falls back to system tools if mise is not installed
+8. **Mock Actions**: Supports custom mock actions for testing workflows locally
 
 ## Installation
 
@@ -119,6 +129,42 @@ lacky --version
 lacky --help
 ```
 
+### Interactive Experience
+
+When you run a workflow, lacky will interactively prompt you:
+
+1. **Job Selection**: Before each job, you'll be asked whether to run it
+   ```
+   Do you want to run job 'build'? (y/n/a/q/s):
+   ```
+   - `y` (yes) - Run this job
+   - `n` (no) - Skip this job
+   - `a` (all) - Run this and all remaining jobs without asking
+   - `q` (quit) - Stop workflow execution
+   - `s` (skip) - Skip this job
+
+2. **Variable Input**: When GitHub context variables are encountered
+   - Menu selection for known variables (e.g., `github.ref_type`)
+   - Text input with helpful placeholders for others (e.g., `github.ref_name`)
+
+3. **Command Confirmation**: For each command (unless running with `--dry-run` or choosing "run all")
+   - Option to run, skip, run all remaining, or quit
+
+This interactive approach gives you fine-grained control over workflow execution, perfect for debugging specific jobs or steps.
+
+### Testing Lacky on Its Own Workflow
+
+You can use Lacky to test itself by running it against its own release workflow:
+
+```bash
+bun run start -- .github/workflows/release.yml
+```
+
+This is a great way to:
+- Test Lacky's functionality with a real-world workflow
+- Debug issues in your CI/CD pipeline locally
+- Understand how Lacky handles complex workflows with multiple jobs, conditions, and matrices
+
 ### Development Mode (from source)
 
 ```bash
@@ -184,6 +230,75 @@ lacky examples/example-workflow.yml
 ```
 
 This will prompt you to select values for `github.ref_type` and `github.event_name`, demonstrating the menu-based selection feature.
+
+## Tool Version Management with mise
+
+Lacky automatically integrates with [mise](https://mise.jdx.dev/) (formerly rtx) to ensure your workflow commands run with the correct tool versions. This is especially useful when your project requires specific versions of tools like Node.js, Python, Terraform, Go, etc.
+
+### How It Works
+
+1. **Automatic Detection**: When lacky starts, it checks if mise is installed on your system
+2. **Version Display**: If mise is found, lacky displays the mise version at startup
+3. **Command Execution**: All workflow commands are executed using `mise exec`, which:
+   - Reads your `.mise.toml` or `.tool-versions` file
+   - Activates the specified tool versions
+   - Runs the command in that environment
+4. **Graceful Fallback**: If mise is not installed, commands run using your system's default tool versions
+
+### Setting Up mise for Your Project
+
+If you haven't set up mise for your project yet:
+
+1. **Install mise**:
+   ```bash
+   curl https://mise.run | sh
+   ```
+
+2. **Create a `.mise.toml` file** in your project root:
+   ```toml
+   [tools]
+   node = "20.10.0"
+   terraform = "1.6.0"
+   python = "3.11"
+   ```
+
+   Or use a `.tool-versions` file (asdf-compatible):
+   ```
+   node 20.10.0
+   terraform 1.6.0
+   python 3.11
+   ```
+
+3. **Install the tools**:
+   ```bash
+   mise install
+   ```
+
+### Example
+
+If your workflow runs `terraform plan` and you have this in `.mise.toml`:
+```toml
+[tools]
+terraform = "1.6.0"
+```
+
+Lacky will execute it as:
+```bash
+mise exec -- terraform plan
+```
+
+This ensures the command uses Terraform 1.6.0, regardless of what version (if any) is installed system-wide.
+
+### Benefits
+
+- **Consistency**: Same tool versions locally and in CI/CD
+- **Isolation**: Different projects can use different tool versions
+- **Reproducibility**: Workflow behavior matches production environments
+- **No Conflicts**: Avoid "works on my machine" issues
+
+### Without mise
+
+If you don't use mise, lacky will still work fine—it will just use whatever tool versions are available in your system PATH. The mise integration is completely optional but highly recommended for projects that depend on specific tool versions.
 
 ## Mock Actions
 

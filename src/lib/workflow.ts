@@ -124,6 +124,19 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
             console.log(`  Matrix: ${JSON.stringify(matrixValue)}`);
         }
 
+        // Ask user if they want to run this job
+        const runJobResponse = await askUserConfirmation(`Do you want to run job '${jobDisplayName}'?`);
+        
+        if (runJobResponse === 'no' || runJobResponse === 'skip') {
+            console.log(`  ⏭  Skipping job (user chose not to run)`);
+            return;
+        }
+        
+        if (runJobResponse === 'quit') {
+            console.log(`  🛑 Quitting workflow execution`);
+            throw new Error('Workflow execution stopped by user');
+        }
+
         // Check job condition
         if (job.if) {
             const conditionMet = await evaluateJobCondition(job.if, workflow, context);
