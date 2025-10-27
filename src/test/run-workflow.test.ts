@@ -115,7 +115,7 @@ describe('runWorkflow', () => {
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
         await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
-        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.any(String), true, expect.any(Object), null);
+        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.any(String), false, expect.any(Object), null);
     });
 
     it('should handle multiple jobs', async () => {
@@ -253,7 +253,7 @@ describe('runWorkflow', () => {
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
         await expect(runWorkflow(workflowWithOn, false, '/test/root', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
-        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('subdir'), true, expect.any(Object), null);
+        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('subdir'), false, expect.any(Object), null);
     });
 
     it('should handle job-level working directory defaults', async () => {
@@ -287,7 +287,7 @@ describe('runWorkflow', () => {
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
         await expect(runWorkflow(workflowWithOn, false, '/test/root', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
-        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('job-dir'), true, expect.any(Object), null);
+        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('job-dir'), false, expect.any(Object), null);
     });
 
     it('should handle workflow-level working directory defaults', async () => {
@@ -321,7 +321,7 @@ describe('runWorkflow', () => {
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
         await expect(runWorkflow(workflowWithOn, false, '/test/root', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
-        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('workflow-dir'), true, expect.any(Object), null);
+        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('workflow-dir'), false, expect.any(Object), null);
     });
 
     it('should handle user confirmation responses', async () => {
@@ -587,7 +587,7 @@ describe('runWorkflow', () => {
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
         await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
-        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Branch: main"', expect.any(String), true, expect.any(Object), null);
+        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Branch: main"', expect.any(String), false, expect.any(Object), null);
     });
 
     it('should handle command execution errors', async () => {

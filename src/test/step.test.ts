@@ -49,8 +49,8 @@ describe('Step Functions', () => {
                 expect.any(Object),
                 null
             );
-            expect(consoleSpy).toHaveBeenCalledWith('      Local Terraform version: 1.5.0');
-            expect(consoleSpy).toHaveBeenCalledWith('      \x1b[32m✓\x1b[0m Terraform version matches (1.5.0)');
+            expect(consoleSpy).toHaveBeenCalledWith('\x1b[90mLocal Terraform version: 1.5.0\x1b[0m');
+            expect(consoleSpy).toHaveBeenCalledWith('\x1b[32m✓ Terraform version matches (1.5.0)\x1b[0m');
 
             consoleSpy.mockRestore();
             processSpy.mockRestore();
@@ -71,7 +71,7 @@ describe('Step Functions', () => {
                 .rejects
                 .toThrow('Terraform version mismatch! Required: 1.5.0, Local: 1.4.0');
 
-            expect(consoleSpy).toHaveBeenCalledWith('      ✖ Terraform version mismatch!');
+            expect(consoleSpy).toHaveBeenCalledWith('\x1b[90m✖ Terraform version mismatch!\x1b[0m');
 
             consoleSpy.mockRestore();
         });
@@ -100,7 +100,7 @@ describe('Step Functions', () => {
                 // Expected to throw due to process.exit
             }
 
-            expect(consoleSpy).toHaveBeenCalledWith('      Setting up Terraform...');
+            expect(consoleSpy).toHaveBeenCalledWith('\x1b[90mSetting up Terraform...\x1b[0m');
             expect(mockResolveVariablesInCommand).toHaveBeenCalledWith('1.5.0', mockWorkflow, 'terraform-setup', 'test-job', expect.any(Object));
 
             consoleSpy.mockRestore();
@@ -124,7 +124,7 @@ describe('Step Functions', () => {
 
             await handleAction(mockStep, false, mockWorkflow, '/test/dir', 'test-step', '/test/workflow.yml', 'test-job', createWorkflowContext());
 
-            expect(consoleSpy).toHaveBeenCalledWith('      Running action: tj-actions/changed-files@v41...');
+            expect(consoleSpy).toHaveBeenCalledWith('\x1b[90mRunning action: tj-actions/changed-files@v41...\x1b[0m');
 
             consoleSpy.mockRestore();
         });

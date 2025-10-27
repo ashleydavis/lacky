@@ -51,8 +51,7 @@ export function createSpinner() {
     return ora({
         text: 'Running...',
         color: 'cyan',
-        spinner: 'dots',
-        indent: 6
+        spinner: 'dots'
     });
 }
 
