@@ -71,7 +71,7 @@ describe('checkTerraformVersion', () => {
             exitCode: 0
         });
 
-        await expect(checkTerraformVersion('1.5.0', '/test/dir', null)).rejects.toThrow('process.exit called with code: 1');
+        await expect(checkTerraformVersion('1.5.0', '/test/dir', null)).rejects.toThrow('Terraform version mismatch! Required: 1.5.0, Local: 1.4.0');
     });
 
     it('should throw error when terraform command fails', async () => {
@@ -82,7 +82,7 @@ describe('checkTerraformVersion', () => {
             exitCode: 1
         });
 
-        await expect(checkTerraformVersion('1.5.0', '/test/dir', null)).rejects.toThrow('process.exit called with code: 1');
+        await expect(checkTerraformVersion('1.5.0', '/test/dir', null)).rejects.toThrow('Failed to get local Terraform version: terraform: command not found');
     });
 
     it('should throw error when JSON parsing fails', async () => {

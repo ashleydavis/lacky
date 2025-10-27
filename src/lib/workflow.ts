@@ -2,7 +2,7 @@ import Ajv, { ErrorObject } from 'ajv';
 import * as path from 'path';
 import { Workflow } from '../types/workflow';
 import { evaluateJobCondition, evaluateStepCondition } from './job';
-import { checkTerraformVersion, handleTerraformSetup, handleAction } from './step';
+import { handleTerraformSetup, handleAction } from './step';
 import { 
     extractGitHubExpressions, 
     resolveGitHubExpression, 

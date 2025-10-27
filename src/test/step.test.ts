@@ -66,19 +66,14 @@ describe('Step Functions', () => {
             });
 
             const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-            const processSpy = jest.spyOn(process, 'exit').mockImplementation();
 
-            try {
-                await checkTerraformVersion('1.5.0', '/test/dir', null);
-            } catch (error) {
-                // Expected to throw due to process.exit
-            }
+            await expect(checkTerraformVersion('1.5.0', '/test/dir', null))
+                .rejects
+                .toThrow('Terraform version mismatch! Required: 1.5.0, Local: 1.4.0');
 
             expect(consoleSpy).toHaveBeenCalledWith('      ✖ Terraform version mismatch!');
-            expect(processSpy).toHaveBeenCalledWith(1);
 
             consoleSpy.mockRestore();
-            processSpy.mockRestore();
         });
     });
 
@@ -98,7 +93,6 @@ describe('Step Functions', () => {
             mockResolveVariablesInCommand.mockResolvedValue('1.5.0');
 
             const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-            const processSpy = jest.spyOn(process, 'exit').mockImplementation();
 
             try {
                 await handleTerraformSetup(mockStep, false, mockWorkflow, '/test/dir', 'test-job', createWorkflowContext(null));
@@ -110,7 +104,6 @@ describe('Step Functions', () => {
             expect(mockResolveVariablesInCommand).toHaveBeenCalledWith('1.5.0', mockWorkflow, 'terraform-setup', 'test-job', expect.any(Object));
 
             consoleSpy.mockRestore();
-            processSpy.mockRestore();
         });
     });
 
