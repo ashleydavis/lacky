@@ -33,7 +33,7 @@ export async function resolveGitHubExpression(expression: string, workflow: Work
             GITHUB_CONTEXT_OPTIONS[expression]
         );
         context.resolvedVariables.set(expression, value);
-        console.log(`      🔧 Resolved ${expression} = "${value}"`);
+        console.log(`  • Resolved ${expression} = "${value}"`);
         return value;
     }
 
@@ -42,7 +42,7 @@ export async function resolveGitHubExpression(expression: string, workflow: Work
         const inputName = expression.replace('github.event.inputs.', '');
         const value = await askUserForInput(`Enter value for input '${inputName}'`, 'my-value');
         context.resolvedVariables.set(expression, value);
-        console.log(`      🔧 Resolved ${expression} = "${value}"`);
+        console.log(`  • Resolved ${expression} = "${value}"`);
         return value;
     }
 
@@ -53,35 +53,35 @@ export async function resolveGitHubExpression(expression: string, workflow: Work
         if (workflow?.env && workflow.env[envVarName]) {
             const value = workflow.env[envVarName];
             context.resolvedVariables.set(expression, value);
-            console.log(`      🔧 Resolved ${expression} = "${value}"`);
+            console.log(`  • Resolved ${expression} = "${value}"`);
             return value;
         }
 
         // If not in workflow, ask user
         const value = await askUserForInput(`Enter value for environment variable '${envVarName}'`, 'value');
         context.resolvedVariables.set(expression, value);
-        console.log(`      🔧 Resolved ${expression} = "${value}"`);
+        console.log(`  • Resolved ${expression} = "${value}"`);
         return value;
     }
 
     if (expression.startsWith('github.ref_name')) {
         const value = await askUserForInput('Enter branch/tag name', 'main');
         context.resolvedVariables.set(expression, value);
-        console.log(`      🔧 Resolved ${expression} = "${value}"`);
+        console.log(`  • Resolved ${expression} = "${value}"`);
         return value;
     }
 
     if (expression.startsWith('github.sha')) {
         const value = await askUserForInput('Enter commit SHA', 'abc123def456');
         context.resolvedVariables.set(expression, value);
-        console.log(`      🔧 Resolved ${expression} = "${value}"`);
+        console.log(`  • Resolved ${expression} = "${value}"`);
         return value;
     }
 
     if (expression.startsWith('github.workspace')) {
         const value = await askUserForInput('Enter workspace path', '/home/runner/work/repo/repo');
         context.resolvedVariables.set(expression, value);
-        console.log(`      🔧 Resolved ${expression} = "${value}"`);
+        console.log(`  • Resolved ${expression} = "${value}"`);
         return value;
     }
 
@@ -93,10 +93,10 @@ export async function resolveGitHubExpression(expression: string, workflow: Work
             const resolvedInner = await resolveGitHubExpression(innerExpression, workflow, context);
             try {
                 const parsed = JSON.parse(resolvedInner);
-                console.log(`      🔧 Resolved fromJSON(${innerExpression}) = ${JSON.stringify(parsed)}`);
+                console.log(`  • Resolved fromJSON(${innerExpression}) = ${JSON.stringify(parsed)}`);
                 return JSON.stringify(parsed);
             } catch {
-                console.log(`      🔧 Resolved fromJSON(${innerExpression}) = "${resolvedInner}"`);
+                console.log(`  • Resolved fromJSON(${innerExpression}) = "${resolvedInner}"`);
                 return resolvedInner;
             }
         }
@@ -109,13 +109,13 @@ export async function resolveGitHubExpression(expression: string, workflow: Work
             const [, jobName, outputName] = match;
             if (context.jobOutputs.has(jobName) && context.jobOutputs.get(jobName)!.has(outputName)) {
                 const value = context.jobOutputs.get(jobName)!.get(outputName)!;
-                console.log(`      📤 Using job output: ${jobName}.${outputName} = "${value}"`);
+                console.log(`  • Using job output: ${jobName}.${outputName} = "${value}"`);
                 return value;
             }
             // If job output not found, ask user
             const value = await askUserForInput(`Enter value for job output '${expression}'`, 'output-value');
             context.resolvedVariables.set(expression, value);
-            console.log(`      🔧 Resolved ${expression} = "${value}"`);
+            console.log(`  • Resolved ${expression} = "${value}"`);
             return value;
         }
     }
@@ -142,7 +142,7 @@ export async function resolveVariablesInCommand(command: string, workflow: Workf
             const matrixKey = expression.replace('matrix.', '');
             if (matrixValue.hasOwnProperty(matrixKey)) {
                 value = String(matrixValue[matrixKey]);
-                console.log(`      🔧 Resolved ${expression} = "${value}"`);
+                console.log(`  • Resolved ${expression} = "${value}"`);
             } else {
                 value = await askUserForInput(`Enter value for matrix variable '${expression}'`, 'matrix-value');
             }
@@ -154,7 +154,7 @@ export async function resolveVariablesInCommand(command: string, workflow: Workf
             const match = expression.match(/^steps\.([^.]+)\.outputs\.(.+)$/);
             if (match) {
                 const [, sourceStepId, outputName] = match;
-                console.log(`      📤 Using step output: ${sourceStepId}.${outputName} = "${value}"`);
+                console.log(`  • Using step output: ${sourceStepId}.${outputName} = "${value}"`);
             }
         } else {
             value = await resolveGitHubExpression(expression, workflow, context);
@@ -200,7 +200,7 @@ export async function resolveJobOutputExpression(expression: string, jobName: st
                 context.stepOutputs.get(jobName)!.has(stepId) && 
                 context.stepOutputs.get(jobName)!.get(stepId)!.has(outputName)) {
                 const value = context.stepOutputs.get(jobName)!.get(stepId)!.get(outputName)!;
-                console.log(`      📤 Using step output for job output: ${stepId}.${outputName} = "${value}"`);
+                console.log(`  • Using step output for job output: ${stepId}.${outputName} = "${value}"`);
                 return value;
             }
         }

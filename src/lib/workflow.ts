@@ -1,5 +1,6 @@
 import Ajv, { ErrorObject } from 'ajv';
 import * as path from 'path';
+import pc from 'picocolors';
 import { Workflow } from '../types/workflow';
 import { evaluateJobCondition, evaluateStepCondition } from './job';
 import { handleTerraformSetup, handleAction } from './step';
@@ -84,7 +85,27 @@ export async function validateWorkflowSchema(workflow: Workflow): Promise<{ vali
     }
 }
 
-export async function runWorkflow(workflow: Workflow, isDryRun: boolean, workingDir: string, workflowFile: string, context: WorkflowContext) {
+// Helper function to truncate output
+function truncateOutput(output: string, linesCount: number): { truncated: string; wasTruncated: boolean } {
+    const lines = output.split('\n');
+    const totalLines = linesCount * 2;
+    
+    if (lines.length <= totalLines) {
+        return { truncated: output, wasTruncated: false };
+    }
+
+    const headLines = lines.slice(0, linesCount);
+    const tailLines = lines.slice(-linesCount);
+    const omittedCount = lines.length - headLines.length - tailLines.length;
+    const truncated = `${headLines.join('\n')}\n\n... (${omittedCount} more lines omitted, use --full to see all) ...\n\n${tailLines.join('\n')}`;
+    
+    return { 
+        truncated,
+        wasTruncated: true
+    };
+}
+
+export async function runWorkflow(workflow: Workflow, isDryRun: boolean, workingDir: string, workflowFile: string, context: WorkflowContext, showFullOutput: boolean, truncateLines: number) {
     // Get workflow-level defaults
     const workflowDefaults = workflow.defaults || {};
     const workflowRunDefaults = workflowDefaults.run || {};
@@ -98,11 +119,25 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
         return;
     }
 
-    // Flag to track if we're in "run all" mode
-    let runAllMode = false;
+    // Flags to track if we're in "run all" mode (separate for jobs and commands)
+    let runAllJobsMode = false;
+    let runAllCommandsMode = false;
 
     // Track completed jobs for dependency resolution
     const completedJobs = new Set<string>();
+
+    // Track execution results for summary
+    type StepResult = {
+        name: string;
+        status: 'success' | 'failed' | 'skipped';
+        command?: string;
+    };
+    type JobResult = {
+        name: string;
+        status: 'success' | 'failed' | 'skipped';
+        steps: StepResult[];
+    };
+    const executionResults: JobResult[] = [];
 
     // Function to check if job dependencies are met
     const areDependenciesMet = (job: any): boolean => {
@@ -114,34 +149,56 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
     // Function to run a single job instance
     const runJobInstance = async (jobName: string, job: any, matrixValue?: any) => {
         const jobDisplayName = matrixValue ? `${jobName} (${JSON.stringify(matrixValue)})` : jobName;
-        console.log(`\n\x1b[97mRunning job: ${jobDisplayName}\x1b[0m`);
+        console.log(`\n${pc.bold(`Running job: ${pc.magenta(jobDisplayName)}`)}`);
+
+        // Create job result tracker
+        const jobResult: JobResult = {
+            name: jobDisplayName,
+            status: 'success',
+            steps: []
+        };
+        executionResults.push(jobResult);
 
         if (job['runs-on']) {
-            console.log(`\x1b[96mRuns on: ${job['runs-on']}\x1b[0m`);
+            console.log(`Runs on: ${job['runs-on']}`);
         }
 
         if (matrixValue) {
-            console.log(`\x1b[96mMatrix: ${JSON.stringify(matrixValue)}\x1b[0m`);
+            console.log(`Matrix: ${JSON.stringify(matrixValue)}`);
         }
 
-        // Ask user if they want to run this job
-        const runJobResponse = await askUserConfirmation(`Do you want to run job '${jobDisplayName}'?`);
+        // Ask user if they want to run this job (unless we're in run all jobs mode)
+        let runJobResponse: 'yes' | 'no' | 'all' | 'quit' | 'skip';
+        
+        if (runAllJobsMode) {
+            runJobResponse = 'yes';
+        } else {
+            runJobResponse = await askUserConfirmation(`Do you want to run job '${jobDisplayName}'?`);
+        }
         
         if (runJobResponse === 'no' || runJobResponse === 'skip') {
-            console.log(`\x1b[96m⏭  Skipping job (user chose not to run)\x1b[0m`);
+            console.log('   Skipping job (user chose not to run)');
+            jobResult.status = 'skipped';
             return;
         }
         
         if (runJobResponse === 'quit') {
-            console.log(`\x1b[96m🛑 Quitting workflow execution\x1b[0m`);
+            console.log('🛑 Quitting workflow execution');
+            jobResult.status = 'skipped';
             throw new Error('Workflow execution stopped by user');
+        }
+        
+        if (runJobResponse === 'all') {
+            runAllJobsMode = true;
+            console.log(pc.yellow('[RUN ALL JOBS MODE ACTIVATED] Will auto-run all remaining jobs'));
         }
 
         // Check job condition
         if (job.if) {
             const conditionMet = await evaluateJobCondition(job.if, workflow, context);
             if (!conditionMet) {
-                console.log(`\x1b[96m⏭  Skipping job (condition not met: ${job.if})\x1b[0m`);
+                console.log(`   Skipping job (condition not met: ${job.if})`);
+                jobResult.status = 'skipped';
                 return;
             }
         }
@@ -149,7 +206,7 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
         // Resolve job-level environment variables for this matrix instance
         const jobEnvVars: { [key: string]: string } = {};
         if (job.env) {
-            console.log(`\x1b[96m[ENV]\x1b[0m`);
+            console.log('[ENV]');
             for (const [key, value] of Object.entries(job.env)) {
                 if (typeof value === 'string') {
                     // Resolve any GitHub expressions in the env value, including matrix variables
@@ -172,7 +229,7 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                     }
                     
                     jobEnvVars[key] = resolvedValue;
-                    console.log(`\x1b[96m${key} = "${resolvedValue}"\x1b[0m`);
+                    console.log(`${key} = "${resolvedValue}"`);
                 } else {
                     jobEnvVars[key] = String(value);
                 }
@@ -180,7 +237,6 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
         }
 
         if (job.steps && Array.isArray(job.steps)) {
-            console.log(`\x1b[96mSteps (${job.steps.length}):\x1b[0m`);
 
             // Get job-level defaults
             const jobDefaults = job.defaults || {};
@@ -190,18 +246,27 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
             for (let i = 0; i < job.steps.length; i++) {
                 const step = job.steps[i];
                 const stepName = step.name || `Step ${i + 1}`;
-                const stepUses = step.uses ? step.uses : (step.run ? 'commands' : 'unknown');
+                const stepUses = step.uses ? `(${step.uses})` : ``;
                 
                 // Generate step ID for step outputs
                 const stepId = step.id || stepName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
-                console.log(`\x1b[37m${i + 1}. ${stepName} (${stepUses})\x1b[0m`);
+                console.log(`${i + 1}. ${stepName} ${stepUses}`);
+
+                // Create step result tracker
+                const stepResult: StepResult = {
+                    name: stepName,
+                    status: 'success',
+                    command: step.run
+                };
+                jobResult.steps.push(stepResult);
 
                 // Check step condition
                 if (step.if) {
                     const conditionMet = await evaluateStepCondition(step.if, workflow, jobName, context);
                     if (!conditionMet) {
-                        console.log(`\x1b[90m⏭  Skipping step (condition not met: ${step.if})\x1b[0m`);
+                        console.log(`   Skipping step (condition not met: ${step.if})`);
+                        stepResult.status = 'skipped';
                         continue;
                     }
                 }
@@ -224,35 +289,42 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                     let resolvedCommand = await resolveVariablesInCommand(step.run, workflow, stepId, jobName, context, matrixValue);
 
                     if (isDryRun) {
-                        console.log(`\x1b[90m[PREVIEW] Would execute: ${resolvedCommand} (in ${stepWorkingDir})\x1b[0m`);
+                        console.log(`[PREVIEW] Would execute: ${resolvedCommand} (in ${stepWorkingDir})`);
                     } 
                     else {
                         // Ask user for confirmation before running the command
-                        console.log(`\n\x1b[90m🔧 COMMAND CONFIRMATION\x1b[0m`);
-                        console.log(`\x1b[90mCommand:   \x1b[36m${resolvedCommand}\x1b[0m`);
-                        console.log(`\x1b[90mDirectory: \x1b[35m${stepWorkingDir}\x1b[0m`);
+                        if (resolvedCommand.includes('\n')) {
+                            console.log(pc.magenta('\nCommand:'));
+                            console.log(pc.yellow(resolvedCommand));
+                        } else {
+                            console.log(`${pc.magenta('\nCommand:')}   ${pc.yellow(resolvedCommand)}`);
+                        }
+                        console.log(`Directory: ${pc.cyan(stepWorkingDir)}`);
 
                         let shouldRun: 'yes' | 'no' | 'all' | 'quit' | 'skip';
 
-                        if (runAllMode) {
+                        if (runAllCommandsMode) {
                             shouldRun = 'yes';
                         } 
                         else {
-                            shouldRun = await askUserConfirmation(`\x1b[1mDo you want to run this command?\x1b[0m`);
+                            shouldRun = await askUserConfirmation(pc.bold('Please review the command above. Do you trust this command and want to run it on your computer?'));
                         }
 
                         if (shouldRun === 'quit') {
-                            console.log(`\x1b[31m[QUIT] Exiting workflow...\x1b[0m`);
+                            console.log(pc.red('[QUIT] Exiting workflow...'));
+                            stepResult.status = 'skipped';
+                            jobResult.status = 'skipped';
                             return;
                         }
 
                         if (shouldRun === 'skip') {
-                            console.log(`\x1b[90m⏭  Skipping command\x1b[0m`);
+                            console.log('   Skipping command');
+                            stepResult.status = 'skipped';
                         } 
                         else if (shouldRun === 'yes' || shouldRun === 'all') {
                             if (shouldRun === 'all') {
-                                runAllMode = true;
-                                console.log(`\x1b[33m[RUN ALL MODE ACTIVATED] Will auto-execute all remaining commands\x1b[0m`);
+                                runAllCommandsMode = true;
+                                console.log(pc.yellow('[RUN ALL COMMANDS MODE ACTIVATED] Will auto-execute all remaining commands'));
                             }
 
                             // Start animated progress indicator
@@ -269,38 +341,61 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                                 };
                                 const result = await executeCommand(resolvedCommand, stepWorkingDir, false, envVars, context.miseVersion);
                                 
-                                if (result.success) {
-                                    spinner.succeed(`\x1b[32mExit code: \x1b[32m${result.exitCode}\x1b[0m`);
-                                } 
-                                else {
-                                    spinner.fail(`\x1b[31mExit code: \x1b[31m${result.exitCode}\x1b[0m`);
-                                }
+                                // Stop spinner first
+                                spinner.stop();
 
-                                // Print output after spinner has stopped
+                                // Print output first
                                 if (result.output) {
-                                    process.stdout.write(`\x1b[90m${result.output}\x1b[0m`);
+                                    console.log('\nStdout:');
+                                    if (showFullOutput) {
+                                        console.log(pc.gray(result.output));
+                                    } else {
+                                        const { truncated } = truncateOutput(result.output, truncateLines);
+                                        console.log(pc.gray(truncated));
+                                    }
                                 }
                                 if (result.error) {
-                                    process.stderr.write(`\x1b[90m${result.error}\x1b[0m`);
+                                    console.log('\nStderr:');
+                                    if (showFullOutput) {
+                                        console.log(pc.gray(result.error));
+                                    } else {
+                                        const { truncated } = truncateOutput(result.error, truncateLines);
+                                        console.log(pc.gray(truncated));
+                                    }
+                                }
+
+                                // Then show success/fail with exit code
+                                if (result.success) {
+                                    console.log(pc.green(`✓ Exit code: ${result.exitCode}`));
+                                    stepResult.status = 'success';
+                                } 
+                                else {
+                                    console.log(pc.red(`✗ Exit code: ${result.exitCode}`));
+                                    stepResult.status = 'failed';
+                                    jobResult.status = 'failed';
                                 }
 
                                 if (!result.success) {
                                     // Ask if user wants to continue after failure
                                     let shouldContinue: 'yes' | 'no' | 'all' | 'quit' | 'skip';
-                                    if (runAllMode) {
+                                    if (runAllCommandsMode) {
                                         shouldContinue = 'yes';
-                                        console.log(`\x1b[32m[RUN ALL MODE] Continuing despite failure...\x1b[0m`);
+                                        console.log(pc.green('[RUN ALL COMMANDS MODE] Continuing despite failure...'));
                                     } 
                                     else {
                                         shouldContinue = await askUserConfirmation(`Do you want to continue with the next step?`);
                                     }
                                     if (shouldContinue === 'quit') {
-                                        console.log(`\x1b[31m[QUIT] Exiting workflow...\x1b[0m`);
+                                        console.log(pc.red('[QUIT] Exiting workflow...'));
                                         return;
                                     }
                                     if (shouldContinue === 'no') {
-                                        console.log(`\x1b[90mStopping workflow execution\x1b[0m`);
+                                        console.log('Stopping workflow execution');
                                         return;
+                                    }
+                                    if (shouldContinue === 'all') {
+                                        runAllCommandsMode = true;
+                                        console.log(pc.yellow('[RUN ALL COMMANDS MODE ACTIVATED] Will auto-execute all remaining commands'));
                                     }
                                 }
 
@@ -316,7 +411,7 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                                     
                                     for (const [key, value] of githubOutputs) {
                                         context.stepOutputs.get(jobName)!.get(stepId)!.set(key, value);
-                                        console.log(`\x1b[90m[OUTPUT] ${key} = "${value}"\x1b[0m`);
+                                        console.log(pc.gray(`[OUTPUT] ${key} = "${value}"`));
                                     }
                                 }
                                 
@@ -330,7 +425,7 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                             }
                         } 
                         else {
-                            console.log(`\x1b[90m⏭  Skipping command\x1b[0m`);
+                            console.log('   Skipping command');
                         }
                     }
                 } 
@@ -349,7 +444,8 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                     } 
                     else if (step.uses && step.uses.startsWith('actions/checkout')) {
                         // Skip actions/checkout - repo is expected to be already checked out
-                        console.log(`\x1b[90m⏭  Skipping ${step.uses} (repo already checked out)\x1b[0m`);
+                        console.log(`   Skipping ${step.uses} (repo already checked out)`);
+                        stepResult.status = 'skipped';
                     }
                     else if (step.uses) {
                         // Handle any other action (custom or built-in) - let the mock system determine if a mock exists
@@ -361,19 +457,22 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                                 : workflowWorkingDir
                                     ? path.resolve(workingDir, workflowWorkingDir)
                                     : workingDir;
-                        await handleAction(step, isDryRun, workflow, stepWorkingDir, stepId, workflowFile, jobName, context);
+                        const actionStatus = await handleAction(step, isDryRun, workflow, stepWorkingDir, stepId, workflowFile, jobName, context);
+                        stepResult.status = actionStatus;
+                        if (actionStatus === 'failed') {
+                            jobResult.status = 'failed';
+                        }
                     }
                     else {
                         if (isDryRun) {
-                            console.log(`\x1b[90m[PREVIEW] Would run ${stepUses} step\x1b[0m`);
+                            console.log(`[PREVIEW] Would run ${stepUses} step`);
                         } 
                         else {
-                            console.log(`\x1b[90mRunning ${stepUses} step...\x1b[0m`);
+                            console.log(`Running ${stepUses} step...`);
                             await new Promise(resolve => setTimeout(resolve, 500));
                         }
                     }
                 }
-
 
                 // Add blank line after each step
                 console.log('');
@@ -386,15 +485,15 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                 context.jobOutputs.set(jobName, new Map());
             }
             
-            console.log(`\x1b[96m[OUTPUTS]\x1b[0m`);
+            console.log('[OUTPUTS]');
             for (const [outputName, outputExpression] of Object.entries(job.outputs)) {
                 const outputValue = await resolveJobOutputExpression(outputExpression as string, jobName, workflow, context);
                 context.jobOutputs.get(jobName)!.set(outputName, outputValue);
-                console.log(`\x1b[96m${outputName} = "${outputValue}"\x1b[0m`);
+                console.log(`${outputName} = "${outputValue}"`);
             }
         }
 
-        console.log(`\x1b[32m✓ Job '${jobDisplayName}' completed\x1b[0m`);
+        console.log(pc.green(`✓ Job '${jobDisplayName}' completed`));
     };
 
     // Main job execution loop with dependency resolution
@@ -455,17 +554,17 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                 generateCombinations(matrixKeys, 0, {});
 
                 // Display matrix combinations
-                console.log(`\x1b[96m[MATRIX]\x1b[0m`);
-                console.log(`\x1b[96mMatrix combinations (${matrixValues.length}):\x1b[0m`);
+                console.log('[MATRIX]');
+                console.log(`Matrix combinations (${matrixValues.length}):`);
                 for (let i = 0; i < matrixValues.length; i++) {
-                    console.log(`\x1b[96m${i + 1}. ${JSON.stringify(matrixValues[i])}\x1b[0m`);
+                    console.log(`${i + 1}. ${JSON.stringify(matrixValues[i])}`);
                 }
                 console.log('');
 
                 // Run job for each matrix combination
                 for (let i = 0; i < matrixValues.length; i++) {
                     const matrixValue = matrixValues[i];
-                    console.log(`\n\x1b[33mRunning matrix job ${i + 1} of ${matrixValues.length}\x1b[0m`);
+                    console.log(`\n${pc.yellow(`Running matrix job ${i + 1} of ${matrixValues.length}`)}`);
                     await runJobInstance(jobName, job, matrixValue);
                     anyJobRun = true;
                 }
@@ -486,4 +585,95 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
             break;
         }
     }
+
+    // Print execution summary
+    printExecutionSummary(workflow.name || 'Workflow', executionResults);
+}
+
+function printExecutionSummary(workflowName: string, results: Array<{name: string; status: 'success' | 'failed' | 'skipped'; steps: Array<{name: string; status: 'success' | 'failed' | 'skipped'; command?: string}>}>) {
+    console.log('\n' + pc.bold('═'.repeat(60)));
+    console.log(pc.bold('Summary'));
+    
+    const statusIcon = (status: 'success' | 'failed' | 'skipped') => {
+        if (status === 'success') return pc.green('✓');
+        if (status === 'failed') return pc.red('✗');
+        return pc.gray('⊝');
+    };
+    
+    const statusColor = (status: 'success' | 'failed' | 'skipped', text: string) => {
+        if (status === 'success') return pc.green(text);
+        if (status === 'failed') return pc.red(text);
+        return pc.gray(text);
+    };
+    
+    // Print ASCII tree
+    console.log(`\n${pc.bold(workflowName)}`);
+    
+    for (let i = 0; i < results.length; i++) {
+        const job = results[i];
+        const isLastJob = i === results.length - 1;
+        const jobPrefix = isLastJob ? '└─' : '├─';
+        const childPrefix = isLastJob ? '  ' : '│ ';
+        
+        // Empty line before each job (with tree continuation)
+        if (i > 0) {
+            console.log('│');
+        }
+        console.log(`${jobPrefix} ${statusIcon(job.status)} ${statusColor(job.status, job.name)}`);
+        
+        for (let j = 0; j < job.steps.length; j++) {
+            const step = job.steps[j];
+            const isLastStep = j === job.steps.length - 1;
+            const stepPrefix = isLastStep ? '└─' : '├─';
+            
+            console.log(`${childPrefix}${stepPrefix} ${statusIcon(step.status)} ${statusColor(step.status, step.name)}`);
+            
+            // Show command as a single leaf node (max 3 lines)
+            if (step.command) {
+                const commandLines = step.command.split('\n').filter(line => line.trim());
+                const maxLines = 3;
+                const truncated = commandLines.length > maxLines;
+                const displayLines = truncated ? commandLines.slice(0, maxLines) : commandLines;
+                const cmdPrefix = isLastStep ? '  ' : '│ ';
+                
+                // First line of command with tree character
+                console.log(`${childPrefix}${cmdPrefix}└─ ${pc.gray(displayLines[0].trim())}`);
+                
+                // Remaining lines indented without tree characters
+                for (let k = 1; k < displayLines.length; k++) {
+                    console.log(`${childPrefix}${cmdPrefix}   ${pc.gray(displayLines[k].trim())}`);
+                }
+                
+                // Show truncation indicator if there are more lines
+                if (truncated) {
+                    const omittedCount = commandLines.length - maxLines;
+                    console.log(`${childPrefix}${cmdPrefix}   ${pc.gray(`... (${omittedCount} more line${omittedCount > 1 ? 's' : ''})`)}`);
+                }
+            }
+        }
+    }
+    
+    // Print summary stats
+    const totalJobs = results.length;
+    const successfulJobs = results.filter(j => j.status === 'success').length;
+    const failedJobs = results.filter(j => j.status === 'failed').length;
+    const skippedJobs = results.filter(j => j.status === 'skipped').length;
+    
+    const allSteps = results.flatMap(j => j.steps);
+    const totalSteps = allSteps.length;
+    const successfulSteps = allSteps.filter(s => s.status === 'success').length;
+    const failedSteps = allSteps.filter(s => s.status === 'failed').length;
+    const skippedSteps = allSteps.filter(s => s.status === 'skipped').length;
+
+    console.log();
+        
+    const jobParts = [pc.green(`${successfulJobs} passed`)];
+    if (failedJobs > 0) jobParts.push(pc.red(`${failedJobs} failed`));
+    if (skippedJobs > 0) jobParts.push(pc.gray(`${skippedJobs} skipped`));
+    console.log(`Jobs:  ${jobParts.join(', ')} (${totalJobs} total)`);
+    
+    const stepParts = [pc.green(`${successfulSteps} passed`)];
+    if (failedSteps > 0) stepParts.push(pc.red(`${failedSteps} failed`));
+    if (skippedSteps > 0) stepParts.push(pc.gray(`${skippedSteps} skipped`));
+    console.log(`Steps: ${stepParts.join(', ')} (${totalSteps} total)`);
 }

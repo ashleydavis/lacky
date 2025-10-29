@@ -22,6 +22,7 @@ jest.mock('../lib/input', () => ({
         start: jest.fn(),
         succeed: jest.fn(),
         fail: jest.fn(),
+        stop: jest.fn(),
     })),
 }));
 
@@ -55,7 +56,7 @@ describe('runWorkflow', () => {
         };
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
     });
 
     it('should handle workflow with no jobs property', async () => {
@@ -65,7 +66,7 @@ describe('runWorkflow', () => {
         };
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
     });
 
     it('should run single job with single step in dry run mode', async () => {
@@ -85,7 +86,7 @@ describe('runWorkflow', () => {
         };
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, true, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, true, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
         expect(mockExecuteCommand).not.toHaveBeenCalled();
     });
 
@@ -114,7 +115,7 @@ describe('runWorkflow', () => {
         });
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
         expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.any(String), false, expect.any(Object), null);
     });
 
@@ -161,7 +162,7 @@ describe('runWorkflow', () => {
             });
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
         expect(mockExecuteCommand).toHaveBeenCalledTimes(2);
     });
 
@@ -177,7 +178,7 @@ describe('runWorkflow', () => {
         };
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
     });
 
     it('should handle step without name', async () => {
@@ -204,7 +205,7 @@ describe('runWorkflow', () => {
         });
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
     });
 
     it('should handle step without run or uses', async () => {
@@ -223,7 +224,7 @@ describe('runWorkflow', () => {
         };
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
     });
 
     it('should handle working directory resolution', async () => {
@@ -252,7 +253,7 @@ describe('runWorkflow', () => {
         });
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/root', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/root', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
         expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('subdir'), false, expect.any(Object), null);
     });
 
@@ -286,7 +287,7 @@ describe('runWorkflow', () => {
         });
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/root', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/root', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
         expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('job-dir'), false, expect.any(Object), null);
     });
 
@@ -320,7 +321,7 @@ describe('runWorkflow', () => {
         });
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/root', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/root', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
         expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('workflow-dir'), false, expect.any(Object), null);
     });
 
@@ -343,19 +344,19 @@ describe('runWorkflow', () => {
         // Test 'no' response
         mockAskUserConfirmation.mockResolvedValueOnce('no');
         const workflowWithOn1 = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn1, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn1, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
         expect(mockExecuteCommand).not.toHaveBeenCalled();
 
         // Test 'skip' response
         mockAskUserConfirmation.mockResolvedValueOnce('skip');
         const workflowWithOn2 = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn2, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn2, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
         expect(mockExecuteCommand).not.toHaveBeenCalled();
 
         // Test 'quit' response - should throw error
         mockAskUserConfirmation.mockResolvedValueOnce('quit');
         const workflowWithOn3 = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn3, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).rejects.toThrow('Workflow execution stopped by user');
+        await expect(runWorkflow(workflowWithOn3, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).rejects.toThrow('Workflow execution stopped by user');
         expect(mockExecuteCommand).not.toHaveBeenCalled();
     });
 
@@ -395,7 +396,7 @@ describe('runWorkflow', () => {
             });
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
         expect(mockExecuteCommand).toHaveBeenCalledTimes(2);
     });
 
@@ -426,7 +427,7 @@ describe('runWorkflow', () => {
         });
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
     });
 
     it('should handle command failure and quit', async () => {
@@ -456,7 +457,7 @@ describe('runWorkflow', () => {
         });
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
     });
 
     it('should handle command failure and stop', async () => {
@@ -486,7 +487,7 @@ describe('runWorkflow', () => {
         });
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
     });
 
     it('should handle terraform setup step', async () => {
@@ -517,7 +518,7 @@ describe('runWorkflow', () => {
         });
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
     });
 
     it('should handle uses step in dry run mode', async () => {
@@ -537,7 +538,7 @@ describe('runWorkflow', () => {
         };
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, true, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, true, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
     });
 
     it('should handle uses step in normal mode', async () => {
@@ -557,7 +558,7 @@ describe('runWorkflow', () => {
         };
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
     });
 
     it('should resolve variables in commands', async () => {
@@ -586,7 +587,7 @@ describe('runWorkflow', () => {
         });
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).resolves.not.toThrow();
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
         expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Branch: main"', expect.any(String), false, expect.any(Object), null);
     });
 
@@ -612,6 +613,6 @@ describe('runWorkflow', () => {
         mockExecuteCommand.mockRejectedValueOnce(new Error('Command execution failed'));
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
-        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null))).rejects.toThrow('Command execution failed');
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).rejects.toThrow('Command execution failed');
     });
 });
