@@ -4,12 +4,13 @@ import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
+import pc from 'picocolors';
 import { validateWorkflowSchema, runWorkflow } from './lib/workflow';
 import { checkMiseInstallation } from './lib/tools';
 import { createWorkflowContext } from './lib/context';
 import packageJson from '../package.json';
 
-async function processWorkflowFile(workflowFile: string, isDryRun: boolean = false): Promise<void> {
+async function processWorkflowFile(workflowFile: string, isDryRun: boolean, showFullOutput: boolean, truncateLines: number): Promise<void> {
     // Check mise installation and print version
     const miseVersion = checkMiseInstallation();
     if (miseVersion) {
@@ -26,12 +27,12 @@ async function processWorkflowFile(workflowFile: string, isDryRun: boolean = fal
     }
 
     // Read and validate YAML
-    console.log(`Reading workflow file: \x1b[32m${workflowFile}\x1b[0m`);
+    console.log(`Reading workflow file: ${pc.cyan(workflowFile)}`);
     const fileContent = fs.readFileSync(workflowFile, 'utf8');
 
     try {
         const workflow = yaml.load(fileContent) as any;
-        console.log('\x1b[32m✓\x1b[0m YAML syntax is valid');
+        console.log(pc.green('✓ YAML syntax is valid'));
 
         // Basic workflow validation
         if (!workflow || typeof workflow !== 'object') {
@@ -47,7 +48,7 @@ async function processWorkflowFile(workflowFile: string, isDryRun: boolean = fal
             process.exit(1);
         }
 
-        console.log('\x1b[32m✓\x1b[0m Schema validation passed');
+        console.log(pc.green('✓ Schema validation passed'));
 
         if (!workflow.name) {
             console.log('Warning: Workflow has no name');
@@ -77,17 +78,11 @@ async function processWorkflowFile(workflowFile: string, isDryRun: boolean = fal
             ? path.dirname(workflowsDir) // Go up from .github to repo root
             : workflowDir; // Fallback to workflow file's directory
 
-        console.log(`Repository root: ${workingDir}`);
+        console.log(`Repository root: ${pc.cyan(workingDir)}`);
 
         // Run the workflow.
-        if (isDryRun) {
-            console.log('\nStarting workflow (PREVIEW MODE)...');
-        } 
-        else {
-            console.log('\nStarting workflow...');
-        }
         const context = createWorkflowContext(miseVersion);
-        await runWorkflow(workflow, isDryRun, workingDir, workflowFile, context);
+        await runWorkflow(workflow, isDryRun, workingDir, workflowFile, context, showFullOutput, truncateLines);
 
     } 
     catch (yamlError: any) {
@@ -104,10 +99,14 @@ program
     .version(packageJson.version)
     .argument('<workflow-file>', 'Path to the GitHub workflow YAML file')
     .option('-d, --dry-run', 'Show what commands would be executed without running them (preview)')
+    .option('-f, --full', 'Show full command output without truncation')
+    .option('-l, --lines <number>', 'Number of lines to show at start and end of truncated output', '10')
     .action(async (workflowFile, options) => {
         try {
             const isDryRun = options.dryRun || false;
-            await processWorkflowFile(workflowFile, isDryRun);
+            const showFullOutput = options.full || false;
+            const truncateLines = parseInt(options.lines, 10);
+            await processWorkflowFile(workflowFile, isDryRun, showFullOutput, truncateLines);
         } 
         catch (error: any) {
             console.error('Error:', error.message);
