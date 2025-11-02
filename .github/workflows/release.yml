@@ -494,6 +494,7 @@ jobs:
             ## Installation
             1. Download the appropriate file for your platform
             2. Extract the archive
-            3. Make the binary executable (Linux/macOS): `chmod +x lacky`
-            4. Move to your PATH or run directly
+            3. Make the binary executable (Linux/MacOS): `chmod +x lacky`
+            4. Remove quarantine attributes (MacOS only) (required for unsigned binaries): `xattr -c lacky`
+            5. Move to your PATH or run directly
 
