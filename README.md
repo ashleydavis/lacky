@@ -27,7 +27,7 @@ curl -L https://github.com/ashleydavis/lacky/releases/latest/download/lacky-linu
 
 # Make executable and move to PATH
 chmod +x lacky
-sudo mv lacky ~/.local/bin/
+mv lacky ~/.local/bin/
 ```
 
 #### macOS (Intel)
@@ -40,7 +40,7 @@ xattr -c lacky
 
 # Make executable and move to PATH
 chmod +x lacky
-sudo mv lacky /usr/local/bin/
+mv lacky /somewhere/in/your/path
 ```
 
 #### macOS (Apple Silicon)
@@ -53,7 +53,7 @@ xattr -c lacky
 
 # Make executable and move to PATH
 chmod +x lacky
-sudo mv lacky /usr/local/bin/
+mv lacky /somewhere/in/your/path
 ```
 
 **macOS Security Note**: If you encounter "cannot be opened because the developer cannot be verified" or similar security warnings, you need to remove the quarantine attributes that macOS adds to downloaded files:
@@ -77,7 +77,7 @@ curl -L https://github.com/ashleydavis/lacky/releases/download/nightly/lacky-lin
 
 # Make executable and move to PATH
 chmod +x lacky
-sudo mv lacky ~/.local/bin/
+mv lacky ~/.local/bin/
 ```
 
 ### Development Installation
