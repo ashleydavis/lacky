@@ -67,7 +67,7 @@ jobs:
           path: |
             ~/.bun/install/cache
             node_modules
-          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-bun-
 
@@ -97,7 +97,7 @@ jobs:
           path: |
             ~/.bun/install/cache
             node_modules
-          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-bun-
 
@@ -147,7 +147,7 @@ jobs:
           path: |
             ~/.bun/install/cache
             node_modules
-          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-bun-
 
@@ -211,7 +211,7 @@ jobs:
           path: |
             ~/.bun/install/cache
             node_modules
-          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-bun-
 
@@ -272,7 +272,7 @@ jobs:
           path: |
             ~/.bun/install/cache
             node_modules
-          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-bun-
 
@@ -335,7 +335,7 @@ jobs:
           path: |
             ~/.bun/install/cache
             node_modules
-          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-bun-
 
