@@ -470,7 +470,6 @@ jobs:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'nightly' }}
           name: ${{ github.ref_type == 'tag' && format('Lacky {0}', github.ref_name) || 'Lacky Nightly' }}
           draft: false
-          prerelease: ${{ github.ref_type != 'tag' }}
           files: |
             ./artifacts/lacky-linux-x64.tar.gz
             ./artifacts/lacky-windows-x64.zip
