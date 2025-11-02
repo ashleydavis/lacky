@@ -9,7 +9,39 @@ import { validateWorkflowSchema, runWorkflow } from './lib/workflow';
 import { checkMiseInstallation } from './lib/tools';
 import { createWorkflowContext } from './lib/context';
 import packageJson from '../package.json';
+import { Workflow } from './types/workflow';
 
+//
+// Loads the workflow file.
+//
+async function loadWorkflowFile(workflowFile: string): Promise<string> {
+    try {
+        return await fs.promises.readFile(workflowFile, 'utf8');                
+    }
+    catch (err: any) {
+        console.error(`Failed to load workflow file: ${workflowFile}`);
+        console.error(err.message || err.stack || err);
+        process.exit(1);
+    }
+}
+
+//
+// Loads and validates the workflow YAML.
+//
+async function loadWorkflowYaml(workflowFile: string): Promise<Workflow> {
+    try {
+        return yaml.load(await loadWorkflowFile(workflowFile)) as Workflow;
+    }
+    catch (err: any) {
+        console.error('YAML validation failed:');
+        console.error(err.message || err.stack || err);
+        process.exit(1);
+    }    
+}
+
+//
+// Runs the workflow.
+//
 async function processWorkflowFile(workflowFile: string, isDryRun: boolean, showFullOutput: boolean, truncateLines: number): Promise<void> {
     // Check mise installation and print version
     const miseVersion = checkMiseInstallation();
@@ -28,68 +60,53 @@ async function processWorkflowFile(workflowFile: string, isDryRun: boolean, show
 
     // Read and validate YAML
     console.log(`Reading workflow file: ${pc.cyan(workflowFile)}`);
-    const fileContent = fs.readFileSync(workflowFile, 'utf8');
+    const workflow = await loadWorkflowYaml(workflowFile);
 
-    try {
-        const workflow = yaml.load(fileContent) as any;
-        console.log(pc.green('✓ YAML syntax is valid'));
-
-        // Basic workflow validation
-        if (!workflow || typeof workflow !== 'object') {
-            throw new Error('Invalid workflow structure');
-        }
-
-        // Validate against GitHub workflow schema
-        const schemaValidation = await validateWorkflowSchema(workflow);
-
-        if (!schemaValidation.valid) {
-            console.error('Schema validation failed:');
-            schemaValidation.errors.forEach(error => console.error(`  - ${error}`));
-            process.exit(1);
-        }
-
-        console.log(pc.green('✓ Schema validation passed'));
-
-        if (!workflow.name) {
-            console.log('Warning: Workflow has no name');
-        } 
-        else {
-            console.log(`Workflow name: ${workflow.name}`);
-        }
-
-        if (!workflow.on) {
-            console.log('Warning: Workflow has no triggers defined');
-        } 
-        else {
-            console.log(`Triggers: ${Object.keys(workflow.on).join(', ')}`);
-        }
-
-        if (!workflow.jobs || Object.keys(workflow.jobs).length === 0) {
-            console.log('Warning: Workflow has no jobs defined');
-        } 
-        else {
-            console.log(`Jobs: ${Object.keys(workflow.jobs).join(', ')}`);
-        }
-
-        // Calculate working directory (repository root)
-        const workflowDir = path.dirname(path.resolve(workflowFile));
-        const workflowsDir = path.dirname(workflowDir); // Go up from workflows to .github
-        const workingDir = path.basename(workflowsDir) === '.github'
-            ? path.dirname(workflowsDir) // Go up from .github to repo root
-            : workflowDir; // Fallback to workflow file's directory
-
-        console.log(`Repository root: ${pc.cyan(workingDir)}`);
-
-        // Run the workflow.
-        const context = createWorkflowContext(miseVersion);
-        await runWorkflow(workflow, isDryRun, workingDir, workflowFile, context, showFullOutput, truncateLines);
-
-    } 
-    catch (yamlError: any) {
-        console.error('YAML validation failed:');
-        console.error(yamlError.message);
-        process.exit(1);
+    // Basic workflow validation
+    if (!workflow || typeof workflow !== 'object') {
+        throw new Error('Invalid workflow structure');
     }
+
+    console.log(pc.green('✓ YAML syntax is valid'));
+
+    // Validate against GitHub workflow schema
+    await validateWorkflowSchema(workflow);
+
+    console.log(pc.green('✓ Schema validation passed'));
+
+    if (!workflow.name) {
+        console.log('Warning: Workflow has no name');
+    } 
+    else {
+        console.log(`Workflow name: ${workflow.name}`);
+    }
+
+    if (!workflow.on) {
+        console.log('Warning: Workflow has no triggers defined');
+    } 
+    else {
+        console.log(`Triggers: ${Object.keys(workflow.on).join(', ')}`);
+    }
+
+    if (!workflow.jobs || Object.keys(workflow.jobs).length === 0) {
+        console.log('Warning: Workflow has no jobs defined');
+    } 
+    else {
+        console.log(`Jobs: ${Object.keys(workflow.jobs).join(', ')}`);
+    }
+
+    // Calculate working directory (repository root)
+    const workflowDir = path.dirname(path.resolve(workflowFile));
+    const workflowsDir = path.dirname(workflowDir); // Go up from workflows to .github
+    const workingDir = path.basename(workflowsDir) === '.github'
+        ? path.dirname(workflowsDir) // Go up from .github to repo root
+        : workflowDir; // Fallback to workflow file's directory
+
+    console.log(`Repository root: ${pc.cyan(workingDir)}`);
+
+    // Run the workflow.
+    const context = createWorkflowContext(miseVersion);
+    await runWorkflow(workflow, isDryRun, workingDir, workflowFile, context, showFullOutput, truncateLines);
 }
 
 const program = new Command();

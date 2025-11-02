@@ -48,7 +48,10 @@ function readGitHubOutputs(outputFile: string): Map<string, string> {
     return outputs;
 }
 
-export async function validateWorkflowSchema(workflow: Workflow): Promise<{ valid: boolean; errors: string[] }> {
+//
+// Validates the workflow against the GitHub workflow schema.
+//
+export async function validateWorkflowSchema(workflow: Workflow): Promise<void> {
     try {
         // Fetch the GitHub workflow schema
         const response = await fetch(GITHUB_WORKFLOW_SCHEMA_URL);
@@ -67,21 +70,18 @@ export async function validateWorkflowSchema(workflow: Workflow): Promise<{ vali
         });
         const validate = ajv.compile(schema);
         const valid = validate(workflow);
-
         if (!valid) {
             const errors = validate.errors?.map((err: ErrorObject) =>
                 `${err.instancePath || 'root'}: ${err.message}`
             ) || ['Unknown validation error'];
-            return { valid: false, errors };
+            console.error(`Schema validation failed:\n${errors.join('\n')}`);
+            process.exit(1);
         }
-
-        return { valid: true, errors: [] };
     } 
     catch (error: any) {
-        return {
-            valid: false,
-            errors: [`Schema validation failed: ${error.message}`]
-        };
+        console.error(`Schema validation failed: ${error.message}`);
+        console.error(error.stack || error);
+        process.exit(1);
     }
 }
 

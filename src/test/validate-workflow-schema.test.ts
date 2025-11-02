@@ -7,9 +7,15 @@ const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 // Mock the global fetch
 global.fetch = mockFetch;
 
+// Mock process.exit
+const mockExit = jest.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
+    throw new Error(`process.exit(${code})`);
+});
+
 describe('validateWorkflowSchema', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockExit.mockClear();
     });
 
     it('should validate a valid workflow', async () => {
@@ -39,9 +45,9 @@ describe('validateWorkflowSchema', () => {
             json: () => Promise.resolve(mockSchema)
         } as Response);
 
-        const result = await validateWorkflowSchema(validWorkflow);
-        expect(result.valid).toBe(true);
-        expect(result.errors).toEqual([]);
+        await validateWorkflowSchema(validWorkflow);
+        // Should complete without calling process.exit
+        expect(mockExit).not.toHaveBeenCalled();
     });
 
     it('should return errors for invalid workflow', async () => {
@@ -66,20 +72,16 @@ describe('validateWorkflowSchema', () => {
             json: () => Promise.resolve(mockSchema)
         } as Response);
 
-        const result = await validateWorkflowSchema(invalidWorkflow);
-        expect(result.valid).toBe(false);
-        expect(result.errors.length).toBeGreaterThan(0);
-        expect(result.errors[0]).toContain('required');
+        await expect(validateWorkflowSchema(invalidWorkflow)).rejects.toThrow('process.exit(1)');
+        expect(mockExit).toHaveBeenCalledWith(1);
     });
 
     it('should handle fetch errors', async () => {
         mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
         const workflow = { on: { push: {} }, jobs: {} };
-        const result = await validateWorkflowSchema(workflow);
-
-        expect(result.valid).toBe(false);
-        expect(result.errors).toEqual(['Schema validation failed: Network error']);
+        await expect(validateWorkflowSchema(workflow)).rejects.toThrow('process.exit(1)');
+        expect(mockExit).toHaveBeenCalledWith(1);
     });
 
     it('should handle non-ok response', async () => {
@@ -89,10 +91,8 @@ describe('validateWorkflowSchema', () => {
         } as Response);
 
         const workflow = { on: { push: {} }, jobs: {} };
-        const result = await validateWorkflowSchema(workflow);
-
-        expect(result.valid).toBe(false);
-        expect(result.errors).toEqual(['Schema validation failed: Failed to fetch schema: Not Found']);
+        await expect(validateWorkflowSchema(workflow)).rejects.toThrow('process.exit(1)');
+        expect(mockExit).toHaveBeenCalledWith(1);
     });
 
     it('should handle JSON parsing errors', async () => {
@@ -102,10 +102,8 @@ describe('validateWorkflowSchema', () => {
         } as Response);
 
         const workflow = { on: { push: {} }, jobs: {} };
-        const result = await validateWorkflowSchema(workflow);
-
-        expect(result.valid).toBe(false);
-        expect(result.errors).toEqual(['Schema validation failed: Invalid JSON']);
+        await expect(validateWorkflowSchema(workflow)).rejects.toThrow('process.exit(1)');
+        expect(mockExit).toHaveBeenCalledWith(1);
     });
 
     it('should handle complex workflow validation', async () => {
@@ -181,9 +179,9 @@ describe('validateWorkflowSchema', () => {
             json: () => Promise.resolve(mockSchema)
         } as Response);
 
-        const result = await validateWorkflowSchema(complexWorkflow);
-        expect(result.valid).toBe(true);
-        expect(result.errors).toEqual([]);
+        await validateWorkflowSchema(complexWorkflow);
+        // Should complete without calling process.exit
+        expect(mockExit).not.toHaveBeenCalled();
     });
 
     it('should handle validation errors with instance paths', async () => {
@@ -222,9 +220,8 @@ describe('validateWorkflowSchema', () => {
             json: () => Promise.resolve(mockSchema)
         } as Response);
 
-        const result = await validateWorkflowSchema(invalidWorkflow);
-        expect(result.valid).toBe(false);
-        expect(result.errors.length).toBeGreaterThan(0);
+        await expect(validateWorkflowSchema(invalidWorkflow)).rejects.toThrow('process.exit(1)');
+        expect(mockExit).toHaveBeenCalledWith(1);
     });
 
     it('should handle empty workflow', async () => {
@@ -242,9 +239,8 @@ describe('validateWorkflowSchema', () => {
         } as Response);
 
         const workflow = { on: { push: {} }, jobs: {} };
-        const result = await validateWorkflowSchema(workflow);
-        expect(result.valid).toBe(false);
-        expect(result.errors.length).toBeGreaterThan(0);
+        await expect(validateWorkflowSchema(workflow)).rejects.toThrow('process.exit(1)');
+        expect(mockExit).toHaveBeenCalledWith(1);
     });
 
     it('should handle null workflow', async () => {
@@ -262,8 +258,7 @@ describe('validateWorkflowSchema', () => {
         } as Response);
 
         const workflow = { on: { push: {} }, jobs: {} };
-        const result = await validateWorkflowSchema(workflow);
-        expect(result.valid).toBe(false);
-        expect(result.errors.length).toBeGreaterThan(0);
+        await expect(validateWorkflowSchema(workflow)).rejects.toThrow('process.exit(1)');
+        expect(mockExit).toHaveBeenCalledWith(1);
     });
 });

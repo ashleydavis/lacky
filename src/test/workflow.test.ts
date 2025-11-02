@@ -4,9 +4,15 @@ import { Workflow } from '../types/workflow';
 // Mock fetch
 global.fetch = jest.fn();
 
+// Mock process.exit
+const mockExit = jest.spyOn(process, 'exit').mockImplementation((code?: string | number | null) => {
+    throw new Error(`process.exit(${code})`);
+});
+
 describe('Workflow Functions', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockExit.mockClear();
     });
 
     describe('validateWorkflowSchema', () => {
@@ -31,9 +37,9 @@ describe('Workflow Functions', () => {
                 jobs: {}
             };
 
-            const result = await validateWorkflowSchema(mockWorkflow);
-            expect(result.valid).toBe(true);
-            expect(result.errors).toEqual([]);
+            await validateWorkflowSchema(mockWorkflow);
+            // Should complete without calling process.exit
+            expect(mockExit).not.toHaveBeenCalled();
         });
 
         it('should handle fetch errors', async () => {
@@ -45,9 +51,8 @@ describe('Workflow Functions', () => {
                 jobs: {}
             };
 
-            const result = await validateWorkflowSchema(mockWorkflow);
-            expect(result.valid).toBe(false);
-            expect(result.errors).toContain('Schema validation failed: Network error');
+            await expect(validateWorkflowSchema(mockWorkflow)).rejects.toThrow('process.exit(1)');
+            expect(mockExit).toHaveBeenCalledWith(1);
         });
     });
 });
