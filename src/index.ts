@@ -126,9 +126,17 @@ program
             await processWorkflowFile(workflowFile, isDryRun, showFullOutput, truncateLines);
         } 
         catch (error: any) {
-            console.error('An error occurred:');
-            console.error(error.stack || error.message || error);
-            process.exit(1);
+            if (error.name === "ExitPromptError") {
+                //
+                // An exit from inquirer via SIGINT.
+                //
+                process.exit(0);
+            }
+            else {
+                console.error('An error occurred:');
+                console.error(error.stack || error.message || error);
+                process.exit(1);
+            }
         }
     });
 
