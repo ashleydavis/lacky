@@ -1,4 +1,6 @@
 import Ajv, { ErrorObject } from 'ajv';
+import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import pc from 'picocolors';
 import { Workflow } from '../types/workflow';
@@ -19,9 +21,9 @@ const GITHUB_WORKFLOW_SCHEMA_URL = 'https://json.schemastore.org/github-workflow
 
 // Create a temporary GITHUB_OUTPUT file
 function createGitHubOutputFile(): string {
-    const tempDir = require('os').tmpdir();
+    const tempDir = os.tmpdir();
     const outputFile = path.join(tempDir, `github-output-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
-    require('fs').writeFileSync(outputFile, '', 'utf8');
+    fs.writeFileSync(outputFile, '', 'utf8');
     return outputFile;
 }
 
@@ -29,11 +31,11 @@ function createGitHubOutputFile(): string {
 function readGitHubOutputs(outputFile: string): Map<string, string> {
     const outputs = new Map<string, string>();
     
-    if (!require('fs').existsSync(outputFile)) {
+    if (!fs.existsSync(outputFile)) {
         return outputs;
     }
     
-    const content = require('fs').readFileSync(outputFile, 'utf8');
+    const content = fs.readFileSync(outputFile, 'utf8');
     const lines = content.split('\n');
     
     for (const line of lines) {
