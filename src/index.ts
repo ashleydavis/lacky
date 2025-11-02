@@ -126,7 +126,8 @@ program
             await processWorkflowFile(workflowFile, isDryRun, showFullOutput, truncateLines);
         } 
         catch (error: any) {
-            console.error('Error:', error.message);
+            console.error('An error occurred:');
+            console.error(error.stack || error.message || error);
             process.exit(1);
         }
     });
