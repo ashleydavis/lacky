@@ -464,6 +464,16 @@ jobs:
           gh release delete nightly --yes --cleanup-tag || true
         continue-on-error: true
 
+      - name: Create or update nightly tag
+        if: github.ref_type != 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Delete the tag if it exists (in case cleanup-tag didn't work)
+          gh api repos/${{ github.repository }}/git/refs/tags/nightly -X DELETE || true
+          # Create the tag pointing to the current commit
+          gh api repos/${{ github.repository }}/git/refs -f ref=refs/tags/nightly -f sha=${{ github.sha }}
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
