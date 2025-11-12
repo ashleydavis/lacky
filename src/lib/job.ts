@@ -57,7 +57,24 @@ export async function evaluateJobCondition(condition: string, workflow: Workflow
     const failure = () => false;
     const cancelled = () => false;
     
+    // Define GitHub Actions string utility functions
+    const startsWith = (str: string, searchString: string): boolean => {
+        if (typeof str !== 'string' || typeof searchString !== 'string') return false;
+        return str.startsWith(searchString);
+    };
+    
+    const endsWith = (str: string, searchString: string): boolean => {
+        if (typeof str !== 'string' || typeof searchString !== 'string') return false;
+        return str.endsWith(searchString);
+    };
+    
+    const contains = (str: string, searchString: string): boolean => {
+        if (typeof str !== 'string' || typeof searchString !== 'string') return false;
+        return str.includes(searchString);
+    };
+    
     // Evaluate the resolved condition as a JavaScript expression
+    // Note: These functions need to be in scope for eval to access them
     try {
         const result = eval(resolvedCondition);
         return Boolean(result);
@@ -111,7 +128,24 @@ export async function evaluateStepCondition(condition: string, workflow: Workflo
     const failure = () => false;
     const cancelled = () => false;
     
+    // Define GitHub Actions string utility functions
+    const startsWith = (str: string, searchString: string): boolean => {
+        if (typeof str !== 'string' || typeof searchString !== 'string') return false;
+        return str.startsWith(searchString);
+    };
+    
+    const endsWith = (str: string, searchString: string): boolean => {
+        if (typeof str !== 'string' || typeof searchString !== 'string') return false;
+        return str.endsWith(searchString);
+    };
+    
+    const contains = (str: string, searchString: string): boolean => {
+        if (typeof str !== 'string' || typeof searchString !== 'string') return false;
+        return str.includes(searchString);
+    };
+    
     // Evaluate the resolved condition as a JavaScript expression
+    // Note: These functions need to be in scope for eval to access them
     try {
         const result = eval(resolvedCondition);
         return Boolean(result);
