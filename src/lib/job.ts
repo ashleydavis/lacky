@@ -46,9 +46,43 @@ export async function evaluateJobCondition(condition: string, workflow: Workflow
     // Replace other GitHub expressions
     const githubExpressions = extractGitHubExpressions(resolvedCondition);
     for (const expression of githubExpressions) {
+        // Check if this expression contains a function call (e.g., startsWith(...))
+        const functionCallMatch = expression.match(/^(\w+)\((.*)\)$/);
+        if (functionCallMatch) {
+            // This is a function call, we'll handle it during eval
+            // Just replace the ${{ }} wrapper and keep the function call
+            const placeholder = '${{ ' + expression + ' }}';
+            resolvedCondition = resolvedCondition.replace(placeholder, expression);
+        } else {
+            // Regular expression, resolve it normally
+            const value = await resolveGitHubExpression(expression, workflow, context);
+            const placeholder = '${{ ' + expression + ' }}';
+            resolvedCondition = resolvedCondition.replace(placeholder, `"${value}"`);
+        }
+    }
+    
+    // Now resolve any remaining GitHub expressions that might be inside function calls
+    // (e.g., github.event.release.tag_name inside startsWith(...))
+    const remainingExpressions = extractGitHubExpressions(resolvedCondition);
+    for (const expression of remainingExpressions) {
         const value = await resolveGitHubExpression(expression, workflow, context);
         const placeholder = '${{ ' + expression + ' }}';
         resolvedCondition = resolvedCondition.replace(placeholder, `"${value}"`);
+    }
+    
+    // Also handle GitHub expressions without ${{ }} wrapper (direct references in function calls)
+    // Match patterns like github.event.release.tag_name (not wrapped in ${{ }})
+    const directGitHubRefs = resolvedCondition.match(/\bgithub\.\w+(?:\.[\w]+)*/g);
+    if (directGitHubRefs) {
+        for (const ref of directGitHubRefs) {
+            // Only resolve if it's not already a string literal
+            if (!resolvedCondition.includes(`"${ref}"`)) {
+                const value = await resolveGitHubExpression(ref, workflow, context);
+                // Replace the reference, being careful not to replace parts of other strings
+                const regex = new RegExp(`\\b${ref.replace(/\./g, '\\.')}\\b`, 'g');
+                resolvedCondition = resolvedCondition.replace(regex, `"${value}"`);
+            }
+        }
     }
     
     // Define GitHub Actions workflow functions
@@ -117,9 +151,43 @@ export async function evaluateStepCondition(condition: string, workflow: Workflo
     // Replace other GitHub expressions
     const githubExpressions = extractGitHubExpressions(resolvedCondition);
     for (const expression of githubExpressions) {
+        // Check if this expression contains a function call (e.g., startsWith(...))
+        const functionCallMatch = expression.match(/^(\w+)\((.*)\)$/);
+        if (functionCallMatch) {
+            // This is a function call, we'll handle it during eval
+            // Just replace the ${{ }} wrapper and keep the function call
+            const placeholder = '${{ ' + expression + ' }}';
+            resolvedCondition = resolvedCondition.replace(placeholder, expression);
+        } else {
+            // Regular expression, resolve it normally
+            const value = await resolveGitHubExpression(expression, workflow, context);
+            const placeholder = '${{ ' + expression + ' }}';
+            resolvedCondition = resolvedCondition.replace(placeholder, `"${value}"`);
+        }
+    }
+    
+    // Now resolve any remaining GitHub expressions that might be inside function calls
+    // (e.g., github.event.release.tag_name inside startsWith(...))
+    const remainingExpressions = extractGitHubExpressions(resolvedCondition);
+    for (const expression of remainingExpressions) {
         const value = await resolveGitHubExpression(expression, workflow, context);
         const placeholder = '${{ ' + expression + ' }}';
         resolvedCondition = resolvedCondition.replace(placeholder, `"${value}"`);
+    }
+    
+    // Also handle GitHub expressions without ${{ }} wrapper (direct references in function calls)
+    // Match patterns like github.event.release.tag_name (not wrapped in ${{ }})
+    const directGitHubRefs = resolvedCondition.match(/\bgithub\.\w+(?:\.[\w]+)*/g);
+    if (directGitHubRefs) {
+        for (const ref of directGitHubRefs) {
+            // Only resolve if it's not already a string literal
+            if (!resolvedCondition.includes(`"${ref}"`)) {
+                const value = await resolveGitHubExpression(ref, workflow, context);
+                // Replace the reference, being careful not to replace parts of other strings
+                const regex = new RegExp(`\\b${ref.replace(/\./g, '\\.')}\\b`, 'g');
+                resolvedCondition = resolvedCondition.replace(regex, `"${value}"`);
+            }
+        }
     }
     
     // Define GitHub Actions workflow functions
