@@ -111,7 +111,11 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
     // Get workflow-level defaults
     const workflowDefaults = workflow.defaults || {};
     const workflowRunDefaults = workflowDefaults.run || {};
-    const workflowWorkingDir = workflowRunDefaults['working-directory'];
+    const workflowWorkingDirRaw = workflowRunDefaults['working-directory'];
+    // Resolve variables in workflow-level working-directory
+    const workflowWorkingDir = workflowWorkingDirRaw 
+        ? await resolveVariablesInCommand(workflowWorkingDirRaw, workflow, 'workflow-defaults', '', context)
+        : undefined;
 
     const jobs = workflow.jobs || {};
     const jobNames = Object.keys(jobs);
@@ -243,7 +247,11 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
             // Get job-level defaults
             const jobDefaults = job.defaults || {};
             const jobRunDefaults = jobDefaults.run || {};
-            const jobWorkingDir = jobRunDefaults['working-directory'];
+            const jobWorkingDirRaw = jobRunDefaults['working-directory'];
+            // Resolve variables in job-level working-directory (including matrix variables)
+            const jobWorkingDir = jobWorkingDirRaw
+                ? await resolveVariablesInCommand(jobWorkingDirRaw, workflow, 'job-defaults', jobName, context, matrixValue)
+                : undefined;
 
             for (let i = 0; i < job.steps.length; i++) {
                 const step = job.steps[i];
@@ -279,8 +287,12 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                     // 2. Job-level defaults.run.working-directory
                     // 3. Workflow-level defaults.run.working-directory
                     // 4. Repository root
-                    const stepWorkingDir = step['working-directory']
-                        ? path.resolve(workingDir, step['working-directory'])
+                    const stepWorkingDirRaw = step['working-directory'];
+                    const resolvedStepWorkingDir = stepWorkingDirRaw
+                        ? await resolveVariablesInCommand(stepWorkingDirRaw, workflow, stepId, jobName, context, matrixValue)
+                        : undefined;
+                    const stepWorkingDir = resolvedStepWorkingDir
+                        ? path.resolve(workingDir, resolvedStepWorkingDir)
                         : jobWorkingDir
                             ? path.resolve(workingDir, jobWorkingDir)
                             : workflowWorkingDir
@@ -435,8 +447,12 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                     // For non-run steps (like uses), check for special actions
                     if (step.uses && step.uses.includes('hashicorp/setup-terraform')) {
                         // Calculate working directory for this step (same logic as run steps)
-                        const stepWorkingDir = step['working-directory']
-                            ? path.resolve(workingDir, step['working-directory'])
+                        const stepWorkingDirRaw = step['working-directory'];
+                        const resolvedStepWorkingDir = stepWorkingDirRaw
+                            ? await resolveVariablesInCommand(stepWorkingDirRaw, workflow, stepId, jobName, context, matrixValue)
+                            : undefined;
+                        const stepWorkingDir = resolvedStepWorkingDir
+                            ? path.resolve(workingDir, resolvedStepWorkingDir)
                             : jobWorkingDir
                                 ? path.resolve(workingDir, jobWorkingDir)
                                 : workflowWorkingDir
@@ -452,8 +468,12 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                     else if (step.uses) {
                         // Handle any other action (custom or built-in) - let the mock system determine if a mock exists
                         // Calculate working directory for this step (same logic as run steps)
-                        const stepWorkingDir = step['working-directory']
-                            ? path.resolve(workingDir, step['working-directory'])
+                        const stepWorkingDirRaw = step['working-directory'];
+                        const resolvedStepWorkingDir = stepWorkingDirRaw
+                            ? await resolveVariablesInCommand(stepWorkingDirRaw, workflow, stepId, jobName, context, matrixValue)
+                            : undefined;
+                        const stepWorkingDir = resolvedStepWorkingDir
+                            ? path.resolve(workingDir, resolvedStepWorkingDir)
                             : jobWorkingDir
                                 ? path.resolve(workingDir, jobWorkingDir)
                                 : workflowWorkingDir
