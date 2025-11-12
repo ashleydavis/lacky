@@ -249,7 +249,8 @@ export interface JobStrategy {
 }
 
 export interface JobMatrix {
-    [key: string]: string[] | number[] | boolean[];
+    [key: string]: string[] | number[] | boolean[] | any;
+    include?: Array<{ [key: string]: any }>;
 }
 
 export interface JobContainer {

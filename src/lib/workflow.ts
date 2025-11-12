@@ -535,45 +535,66 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
             // Handle matrix strategy
             if (job.strategy && job.strategy.matrix) {
                 const matrix = job.strategy.matrix;
-                const matrixKeys = Object.keys(matrix);
                 const matrixValues: any[] = [];
 
-                // Resolve matrix values first
-                const resolvedMatrix: any = {};
-                for (const key of matrixKeys) {
-                    const value: any = matrix[key];
-                    if (typeof value === 'string' && value.includes('${{')) {
-                        // This is a GitHub expression that needs to be resolved
-                        const resolvedValue = await resolveGitHubExpression(value, workflow, context);
-                        try {
-                            // Try to parse as JSON (for arrays)
-                            resolvedMatrix[key] = JSON.parse(resolvedValue);
-                        } catch {
-                            // If not JSON, treat as single value
-                            resolvedMatrix[key] = resolvedValue;
+                // Check if matrix uses 'include' (array of objects)
+                if (matrix.include && Array.isArray(matrix.include)) {
+                    // Use the include objects directly as matrix combinations
+                    for (const includeObj of matrix.include) {
+                        // Resolve any GitHub expressions in the include object
+                        const resolvedObj: any = {};
+                        for (const [key, value] of Object.entries(includeObj)) {
+                            if (typeof value === 'string' && value.includes('${{')) {
+                                // This is a GitHub expression that needs to be resolved
+                                const resolvedValue = await resolveGitHubExpression(value, workflow, context);
+                                resolvedObj[key] = resolvedValue;
+                            } else {
+                                resolvedObj[key] = value;
+                            }
                         }
-                    } else {
-                        resolvedMatrix[key] = value;
+                        matrixValues.push(resolvedObj);
                     }
+                } else {
+                    // Generate combinations from key-value pairs (existing logic)
+                    const matrixKeys = Object.keys(matrix).filter(key => key !== 'include');
+                    
+                    // Resolve matrix values first
+                    const resolvedMatrix: any = {};
+                    for (const key of matrixKeys) {
+                        const value: any = matrix[key];
+                        if (typeof value === 'string' && value.includes('${{')) {
+                            // This is a GitHub expression that needs to be resolved
+                            const resolvedValue = await resolveGitHubExpression(value, workflow, context);
+                            try {
+                                // Try to parse as JSON (for arrays)
+                                resolvedMatrix[key] = JSON.parse(resolvedValue);
+                            } catch {
+                                // If not JSON, treat as single value
+                                resolvedMatrix[key] = resolvedValue;
+                            }
+                        } else {
+                            resolvedMatrix[key] = value;
+                        }
+                    }
+
+                    // Generate all combinations of matrix values
+                    const generateCombinations = (keys: string[], index: number, current: any) => {
+                        if (index === keys.length) {
+                            matrixValues.push({ ...current });
+                            return;
+                        }
+                        
+                        const key = keys[index];
+                        const values = Array.isArray(resolvedMatrix[key]) ? resolvedMatrix[key] : [resolvedMatrix[key]];
+                        
+                        for (const value of values) {
+                            current[key] = value;
+                            generateCombinations(keys, index + 1, current);
+                        }
+                    };
+
+                    generateCombinations(matrixKeys, 0, {});
                 }
-
-                // Generate all combinations of matrix values
-                const generateCombinations = (keys: string[], index: number, current: any) => {
-                    if (index === keys.length) {
-                        matrixValues.push({ ...current });
-                        return;
-                    }
-                    
-                    const key = keys[index];
-                    const values = Array.isArray(resolvedMatrix[key]) ? resolvedMatrix[key] : [resolvedMatrix[key]];
-                    
-                    for (const value of values) {
-                        current[key] = value;
-                        generateCombinations(keys, index + 1, current);
-                    }
-                };
-
-                generateCombinations(matrixKeys, 0, {});
 
                 // Display matrix combinations
                 console.log('[MATRIX]');
