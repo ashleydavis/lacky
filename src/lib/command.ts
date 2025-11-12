@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 
-export function executeCommand(command: string, cwd: string, showOutput: boolean = false, envVars: Record<string, string> = {}, miseVersion?: string | null): Promise<{ success: boolean; output: string; error: string; exitCode: number }> {
+export function executeCommand(command: string, cwd: string, liveOutput: boolean, envVars: Record<string, string> = {}, miseVersion?: string | null): Promise<{ success: boolean; output: string; error: string; exitCode: number }> {
     return new Promise((resolve) => {
         let shellCommand: string;
 
@@ -31,11 +31,17 @@ export function executeCommand(command: string, cwd: string, showOutput: boolean
         child.stdout?.on('data', (data) => {
             const text = data.toString();
             output += text;
+            if (liveOutput) {
+                console.log(text);
+            }
         });
 
         child.stderr?.on('data', (data) => {
             const text = data.toString();
             error += text;
+            if (liveOutput) {
+                console.log(text);
+            }
         });
 
         child.on('close', (code) => {

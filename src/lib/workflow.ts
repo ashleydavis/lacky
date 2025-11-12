@@ -375,117 +375,87 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                                 console.log(pc.yellow('[RUN ALL COMMANDS MODE ACTIVATED] Will auto-execute all remaining commands'));
                             }
 
-                            // Start animated progress indicator
-                            const spinner = createSpinner();
-
-                            try {
-                                // Create a new GITHUB_OUTPUT file for this job
-                                const githubOutputFile = createGitHubOutputFile();
-                                // Merge env vars: step-level overrides job-level, which overrides workflow-level
-                                const envVars: Record<string, string> = { 
-                                    ...GITHUB_ENV_VARS,
-                                    ...jobEnvVars,
-                                    ...stepEnvVars, // Step-level env vars override job-level
-                                    GITHUB_OUTPUT: githubOutputFile,
-                                };
-                                
-                                // Log step-level env vars if any
-                                if (Object.keys(stepEnvVars).length > 0) {
-                                    console.log('[STEP ENV]');
-                                    for (const [key, value] of Object.entries(stepEnvVars)) {
-                                        // Mask values that look like secrets (contain TOKEN, SECRET, PASSWORD, KEY, etc.)
-                                        const isSecretLike = /(TOKEN|SECRET|PASSWORD|KEY|AUTH|CREDENTIAL)/i.test(key);
-                                        const displayValue = isSecretLike ? '***' : value;
-                                        console.log(`${key} = "${displayValue}"`);
-                                    }
+                            // Create a new GITHUB_OUTPUT file for this job
+                            const githubOutputFile = createGitHubOutputFile();
+                            // Merge env vars: step-level overrides job-level, which overrides workflow-level
+                            const envVars: Record<string, string> = { 
+                                ...GITHUB_ENV_VARS,
+                                ...jobEnvVars,
+                                ...stepEnvVars, // Step-level env vars override job-level
+                                GITHUB_OUTPUT: githubOutputFile,
+                            };
+                            
+                            // Log step-level env vars if any
+                            if (Object.keys(stepEnvVars).length > 0) {
+                                console.log('[STEP ENV]');
+                                for (const [key, value] of Object.entries(stepEnvVars)) {
+                                    // Mask values that look like secrets (contain TOKEN, SECRET, PASSWORD, KEY, etc.)
+                                    const isSecretLike = /(TOKEN|SECRET|PASSWORD|KEY|AUTH|CREDENTIAL)/i.test(key);
+                                    const displayValue = isSecretLike ? '***' : value;
+                                    console.log(`${key} = "${displayValue}"`);
                                 }
-                                
-                                spinner.start();
-                                
-                                const result = await executeCommand(resolvedCommand, stepWorkingDir, false, envVars, context.miseVersion);
-                                
-                                // Stop spinner first
-                                spinner.stop();
+                            }
+                            
+                            const result = await executeCommand(resolvedCommand, stepWorkingDir, true, envVars, context.miseVersion);
 
-                                // Print output first
-                                if (result.output) {
-                                    console.log('\nStdout:');
-                                    if (showFullOutput) {
-                                        console.log(pc.gray(result.output));
-                                    } else {
-                                        const { truncated } = truncateOutput(result.output, truncateLines);
-                                        console.log(pc.gray(truncated));
-                                    }
-                                }
+                            // Then show success/fail with exit code
+                            if (result.success) {
+                                console.log(pc.green(`✓ Exit code: ${result.exitCode}`));
+                                stepResult.status = 'success';
+                            } 
+                            else {
+                                console.log(pc.red(`✗ Exit code: ${result.exitCode}`));
+                                stepResult.status = 'failed';
+                                jobResult.status = 'failed';
+
                                 if (result.error) {
-                                    console.log('\nStderr:');
-                                    if (showFullOutput) {
-                                        console.log(pc.gray(result.error));
-                                    } else {
-                                        const { truncated } = truncateOutput(result.error, truncateLines);
-                                        console.log(pc.gray(truncated));
-                                    }
+                                    console.log(pc.red(result.error));
                                 }
+                            }
 
-                                // Then show success/fail with exit code
-                                if (result.success) {
-                                    console.log(pc.green(`✓ Exit code: ${result.exitCode}`));
-                                    stepResult.status = 'success';
+                            if (!result.success) {
+                                // Ask if user wants to continue after failure
+                                let shouldContinue: 'yes' | 'no' | 'all' | 'quit' | 'skip';
+                                if (runAllCommandsMode) {
+                                    shouldContinue = 'yes';
+                                    console.log(pc.green('[RUN ALL COMMANDS MODE] Continuing despite failure...'));
                                 } 
                                 else {
-                                    console.log(pc.red(`✗ Exit code: ${result.exitCode}`));
-                                    stepResult.status = 'failed';
-                                    jobResult.status = 'failed';
+                                    shouldContinue = await askUserConfirmation(`Do you want to continue with the next step?`);
                                 }
-
-                                if (!result.success) {
-                                    // Ask if user wants to continue after failure
-                                    let shouldContinue: 'yes' | 'no' | 'all' | 'quit' | 'skip';
-                                    if (runAllCommandsMode) {
-                                        shouldContinue = 'yes';
-                                        console.log(pc.green('[RUN ALL COMMANDS MODE] Continuing despite failure...'));
-                                    } 
-                                    else {
-                                        shouldContinue = await askUserConfirmation(`Do you want to continue with the next step?`);
-                                    }
-                                    if (shouldContinue === 'quit') {
-                                        console.log(pc.red('[QUIT] Exiting workflow...'));
-                                        return;
-                                    }
-                                    if (shouldContinue === 'no') {
-                                        console.log('Stopping workflow execution');
-                                        return;
-                                    }
-                                    if (shouldContinue === 'all') {
-                                        runAllCommandsMode = true;
-                                        console.log(pc.yellow('[RUN ALL COMMANDS MODE ACTIVATED] Will auto-execute all remaining commands'));
-                                    }
+                                if (shouldContinue === 'quit') {
+                                    console.log(pc.red('[QUIT] Exiting workflow...'));
+                                    return;
                                 }
+                                if (shouldContinue === 'no') {
+                                    console.log('Stopping workflow execution');
+                                    return;
+                                }
+                                if (shouldContinue === 'all') {
+                                    runAllCommandsMode = true;
+                                    console.log(pc.yellow('[RUN ALL COMMANDS MODE ACTIVATED] Will auto-execute all remaining commands'));
+                                }
+                            }
 
-                                // Read outputs from GITHUB_OUTPUT file and set step outputs
-                                let githubOutputs = readGitHubOutputs(githubOutputFile);                                
-                                if (githubOutputs.size > 0) {
-                                    if (!context.stepOutputs.has(jobName)) {
-                                        context.stepOutputs.set(jobName, new Map());
-                                    }
-                                    if (!context.stepOutputs.get(jobName)!.has(stepId)) {
-                                        context.stepOutputs.get(jobName)!.set(stepId, new Map());
-                                    }
-                                    
-                                    for (const [key, value] of githubOutputs) {
-                                        context.stepOutputs.get(jobName)!.get(stepId)!.set(key, value);
-                                        console.log(pc.gray(`[OUTPUT] ${key} = "${value}"`));
-                                    }
+                            // Read outputs from GITHUB_OUTPUT file and set step outputs
+                            let githubOutputs = readGitHubOutputs(githubOutputFile);                                
+                            if (githubOutputs.size > 0) {
+                                if (!context.stepOutputs.has(jobName)) {
+                                    context.stepOutputs.set(jobName, new Map());
+                                }
+                                if (!context.stepOutputs.get(jobName)!.has(stepId)) {
+                                    context.stepOutputs.get(jobName)!.set(stepId, new Map());
                                 }
                                 
-                                // Clean up the temporary file
-                                //TODO: Might want to actually look at this.
-                                // fs.unlinkSync(githubOutputFile);
-                            } 
-                            catch (error) {
-                                spinner.fail('Command execution failed');
-                                throw error;
+                                for (const [key, value] of githubOutputs) {
+                                    context.stepOutputs.get(jobName)!.get(stepId)!.set(key, value);
+                                    console.log(pc.gray(`[OUTPUT] ${key} = "${value}"`));
+                                }
                             }
+                            
+                            // Clean up the temporary file
+                            //TODO: Might want to actually look at this.
+                            // fs.unlinkSync(githubOutputFile);
                         } 
                         else {
                             console.log('   Skipping command');
