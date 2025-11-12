@@ -3,9 +3,13 @@ import { jest } from '@jest/globals';
 // Mock the askUserForInput function
 const mockAskUserForInput = jest.fn() as jest.MockedFunction<(prompt: string) => Promise<string>>;
 
+// Mock the askUserForSecret function
+const mockAskUserForSecret = jest.fn() as jest.MockedFunction<(prompt: string) => Promise<string>>;
+
 // Mock the input module
 jest.mock('../lib/input', () => ({
     askUserForInput: mockAskUserForInput,
+    askUserForSecret: mockAskUserForSecret,
 }));
 
 import { resolveGitHubExpression } from '../lib/resolve-variable';
@@ -14,6 +18,8 @@ import { createWorkflowContext } from '../lib/context';
 describe('resolveGitHubExpression', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockAskUserForInput.mockReset();
+        mockAskUserForSecret.mockReset();
     });
 
     it('should return cached value if already resolved', async () => {
@@ -118,5 +124,29 @@ describe('resolveGitHubExpression', () => {
 
         expect(result1).toBe('main');
         expect(result2).toBe('abc123');
+    });
+
+    it('should handle secrets expressions using askUserForSecret', async () => {
+        mockAskUserForSecret.mockResolvedValueOnce('secret-token-value');
+        const workflow = { on: { push: {} }, jobs: {} };
+        const context = createWorkflowContext();
+        const result = await resolveGitHubExpression('secrets.ECR_GITHUB_TOKEN', workflow, context);
+        
+        expect(result).toBe('secret-token-value');
+        expect(mockAskUserForSecret).toHaveBeenCalledWith("Enter value for secret 'ECR_GITHUB_TOKEN'");
+        expect(mockAskUserForInput).not.toHaveBeenCalled();
+    });
+
+    it('should cache secret values', async () => {
+        mockAskUserForSecret.mockResolvedValueOnce('cached-secret');
+        const workflow = { on: { push: {} }, jobs: {} };
+        const context = createWorkflowContext();
+        
+        const result1 = await resolveGitHubExpression('secrets.MY_SECRET', workflow, context);
+        const result2 = await resolveGitHubExpression('secrets.MY_SECRET', workflow, context);
+        
+        expect(result1).toBe('cached-secret');
+        expect(result2).toBe('cached-secret');
+        expect(mockAskUserForSecret).toHaveBeenCalledTimes(1);
     });
 });

@@ -14,9 +14,13 @@ jest.mock('../lib/command', () => ({
     executeCommand: mockExecuteCommand,
 }));
 
+// Mock the askUserForSecret function
+const mockAskUserForSecret = jest.fn() as jest.MockedFunction<(prompt: string) => Promise<string>>;
+
 // Mock the input module
 jest.mock('../lib/input', () => ({
     askUserForInput: mockAskUserForInput,
+    askUserForSecret: mockAskUserForSecret,
     askUserConfirmation: mockAskUserConfirmation,
     createSpinner: jest.fn(() => ({
         start: jest.fn(),
@@ -44,6 +48,7 @@ describe('runWorkflow', () => {
         mockExecuteCommand.mockReset();
         mockAskUserConfirmation.mockReset();
         mockAskUserForInput.mockReset();
+        mockAskUserForSecret.mockReset();
         // Default mock return values - 'yes' to run jobs by default
         mockAskUserConfirmation.mockResolvedValue('yes');
         // Clear the resolved variables cache
@@ -116,7 +121,7 @@ describe('runWorkflow', () => {
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
         await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
-        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.any(String), false, expect.any(Object), null);
+        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.any(String), true, expect.any(Object), null);
     });
 
     it('should handle multiple jobs', async () => {
@@ -254,7 +259,7 @@ describe('runWorkflow', () => {
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
         await expect(runWorkflow(workflowWithOn, false, '/test/root', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
-        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('subdir'), false, expect.any(Object), null);
+        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('subdir'), true, expect.any(Object), null);
     });
 
     it('should handle job-level working directory defaults', async () => {
@@ -288,7 +293,7 @@ describe('runWorkflow', () => {
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
         await expect(runWorkflow(workflowWithOn, false, '/test/root', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
-        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('job-dir'), false, expect.any(Object), null);
+        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('job-dir'), true, expect.any(Object), null);
     });
 
     it('should handle workflow-level working directory defaults', async () => {
@@ -322,7 +327,7 @@ describe('runWorkflow', () => {
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
         await expect(runWorkflow(workflowWithOn, false, '/test/root', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
-        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('workflow-dir'), false, expect.any(Object), null);
+        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Hello World"', expect.stringContaining('workflow-dir'), true, expect.any(Object), null);
     });
 
     it('should handle user confirmation responses', async () => {
@@ -588,7 +593,7 @@ describe('runWorkflow', () => {
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
         await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
-        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Branch: main"', expect.any(String), false, expect.any(Object), null);
+        expect(mockExecuteCommand).toHaveBeenCalledWith('echo "Branch: main"', expect.any(String), true, expect.any(Object), null);
     });
 
     it('should handle command execution errors', async () => {
@@ -614,5 +619,194 @@ describe('runWorkflow', () => {
 
         const workflowWithOn = { ...workflow, on: { push: {} } };
         await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).rejects.toThrow('Command execution failed');
+    });
+
+    it('should handle step-level environment variables', async () => {
+        const workflow = {
+            name: 'Test Workflow',
+            jobs: {
+                test: {
+                    'runs-on': 'ubuntu-latest',
+                    steps: [
+                        {
+                            name: 'Test Step',
+                            run: 'echo $TF_VAR_region',
+                            env: {
+                                TF_VAR_region: 'us-west-2',
+                                TF_WORKSPACE: 'production'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+
+        mockAskUserConfirmation.mockResolvedValueOnce('yes');
+        mockExecuteCommand.mockResolvedValueOnce({
+            success: true,
+            output: 'us-west-2',
+            error: '',
+            exitCode: 0
+        });
+
+        const workflowWithOn = { ...workflow, on: { push: {} } };
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
+        
+        // Verify that step env vars were passed to executeCommand
+        expect(mockExecuteCommand).toHaveBeenCalledWith(
+            'echo $TF_VAR_region',
+            expect.any(String),
+            true,
+            expect.objectContaining({
+                TF_VAR_region: 'us-west-2',
+                TF_WORKSPACE: 'production'
+            }),
+            null
+        );
+    });
+
+    it('should resolve GitHub expressions in step-level env variables', async () => {
+        const workflow = {
+            name: 'Test Workflow',
+            jobs: {
+                test: {
+                    'runs-on': 'ubuntu-latest',
+                    steps: [
+                        {
+                            name: 'Test Step',
+                            run: 'echo $BRANCH',
+                            env: {
+                                BRANCH: '${{ github.ref_name }}'
+                            }
+                        }
+                    ]
+                }
+            }
+        };
+
+        mockAskUserForInput.mockResolvedValueOnce('main');
+        mockAskUserConfirmation.mockResolvedValueOnce('yes');
+        mockExecuteCommand.mockResolvedValueOnce({
+            success: true,
+            output: 'main',
+            error: '',
+            exitCode: 0
+        });
+
+        const workflowWithOn = { ...workflow, on: { push: {} } };
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
+        
+        expect(mockExecuteCommand).toHaveBeenCalledWith(
+            'echo $BRANCH',
+            expect.any(String),
+            true,
+            expect.objectContaining({
+                BRANCH: 'main'
+            }),
+            null
+        );
+    });
+
+    it('should handle matrix include strategy', async () => {
+        const workflow = {
+            name: 'Test Workflow',
+            jobs: {
+                test: {
+                    'runs-on': 'ubuntu-latest',
+                    strategy: {
+                        matrix: {
+                            include: [
+                                {
+                                    directory: 'terraform',
+                                    region: 'us-west-2'
+                                }
+                            ]
+                        }
+                    },
+                    defaults: {
+                        run: {
+                            'working-directory': 'terraform/${{ matrix.directory }}'
+                        }
+                    },
+                    steps: [
+                        {
+                            name: 'Test Step',
+                            run: 'echo ${{ matrix.region }}'
+                        }
+                    ]
+                }
+            }
+        };
+
+        mockAskUserConfirmation.mockResolvedValueOnce('yes');
+        mockExecuteCommand.mockResolvedValueOnce({
+            success: true,
+            output: 'us-west-2',
+            error: '',
+            exitCode: 0
+        });
+
+        const workflowWithOn = { ...workflow, on: { push: {} } };
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
+        
+        // Verify that the working directory was resolved with matrix variable
+        expect(mockExecuteCommand).toHaveBeenCalledWith(
+            'echo us-west-2',
+            expect.stringContaining('terraform/terraform'),
+            true,
+            expect.any(Object),
+            null
+        );
+    });
+
+    it('should resolve working-directory with matrix variables', async () => {
+        const workflow = {
+            name: 'Test Workflow',
+            jobs: {
+                test: {
+                    'runs-on': 'ubuntu-latest',
+                    strategy: {
+                        matrix: {
+                            include: [
+                                {
+                                    directory: 'app',
+                                    env: 'production'
+                                }
+                            ]
+                        }
+                    },
+                    defaults: {
+                        run: {
+                            'working-directory': 'apps/${{ matrix.directory }}'
+                        }
+                    },
+                    steps: [
+                        {
+                            name: 'Test Step',
+                            run: 'pwd'
+                        }
+                    ]
+                }
+            }
+        };
+
+        mockAskUserConfirmation.mockResolvedValueOnce('yes');
+        mockExecuteCommand.mockResolvedValueOnce({
+            success: true,
+            output: '/test/dir/apps/app',
+            error: '',
+            exitCode: 0
+        });
+
+        const workflowWithOn = { ...workflow, on: { push: {} } };
+        await expect(runWorkflow(workflowWithOn, false, '/test/dir', '/test/workflow.yml', createWorkflowContext(null), false, 10)).resolves.not.toThrow();
+        
+        expect(mockExecuteCommand).toHaveBeenCalledWith(
+            'pwd',
+            expect.stringContaining('apps/app'),
+            true,
+            expect.any(Object),
+            null
+        );
     });
 });
