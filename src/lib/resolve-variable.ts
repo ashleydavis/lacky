@@ -1,5 +1,5 @@
 import { Workflow } from '../types/workflow';
-import { askUserForInput, askUserToSelectFromMenu } from './input';
+import { askUserForInput, askUserForSecret, askUserToSelectFromMenu } from './input';
 import { WorkflowContext } from './context';
 
 // Define known GitHub context variables with their valid options
@@ -43,6 +43,15 @@ export async function resolveGitHubExpression(expression: string, workflow: Work
         const value = await askUserForInput(`Enter value for input '${inputName}'`, 'my-value');
         context.resolvedVariables.set(expression, value);
         console.log(`  • Resolved ${expression} = "${value}"`);
+        return value;
+    }
+
+    // Handle secrets (e.g., secrets.ECR_GITHUB_TOKEN)
+    if (expression.startsWith('secrets.')) {
+        const secretName = expression.replace('secrets.', '');
+        const value = await askUserForSecret(`Enter value for secret '${secretName}'`);
+        context.resolvedVariables.set(expression, value);
+        console.log(`  • Resolved ${expression} = "***"`); // Don't display the actual secret value
         return value;
     }
 

@@ -302,8 +302,42 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
                     // Resolve variables in the command (including matrix variables)
                     let resolvedCommand = await resolveVariablesInCommand(step.run, workflow, stepId, jobName, context, matrixValue);
 
+                    // Resolve step-level environment variables
+                    const stepEnvVars: { [key: string]: string } = {};
+                    if (step.env) {
+                        for (const [key, value] of Object.entries(step.env)) {
+                            if (typeof value === 'string') {
+                                // Resolve any GitHub expressions in the env value, including matrix variables
+                                let resolvedValue = value;
+                                
+                                // Handle matrix variables in env values
+                                if (matrixValue) {
+                                    for (const [matrixKey, matrixVal] of Object.entries(matrixValue)) {
+                                        const matrixPattern = new RegExp(`\\$\\{\\{\\s*matrix\\.${matrixKey}\\s*\\}\\}`, 'g');
+                                        resolvedValue = resolvedValue.replace(matrixPattern, String(matrixVal));
+                                    }
+                                }
+                                
+                                // Resolve other GitHub expressions
+                                const githubExpressions = extractGitHubExpressions(resolvedValue);
+                                for (const expression of githubExpressions) {
+                                    const exprValue = await resolveGitHubExpression(expression, workflow, context);
+                                    const placeholder = '${{ ' + expression + ' }}';
+                                    resolvedValue = resolvedValue.replace(placeholder, exprValue);
+                                }
+                                
+                                stepEnvVars[key] = resolvedValue;
+                            } else {
+                                stepEnvVars[key] = String(value);
+                            }
+                        }
+                    }
+
                     if (isDryRun) {
                         console.log(`[PREVIEW] Would execute: ${resolvedCommand} (in ${stepWorkingDir})`);
+                        if (Object.keys(stepEnvVars).length > 0) {
+                            console.log(`[PREVIEW] With step env vars: ${JSON.stringify(stepEnvVars)}`);
+                        }
                     } 
                     else {
                         // Ask user for confirmation before running the command
@@ -343,16 +377,31 @@ export async function runWorkflow(workflow: Workflow, isDryRun: boolean, working
 
                             // Start animated progress indicator
                             const spinner = createSpinner();
-                            spinner.start();
 
                             try {
                                 // Create a new GITHUB_OUTPUT file for this job
                                 const githubOutputFile = createGitHubOutputFile();
+                                // Merge env vars: step-level overrides job-level, which overrides workflow-level
                                 const envVars: Record<string, string> = { 
                                     ...GITHUB_ENV_VARS,
                                     ...jobEnvVars,
+                                    ...stepEnvVars, // Step-level env vars override job-level
                                     GITHUB_OUTPUT: githubOutputFile,
                                 };
+                                
+                                // Log step-level env vars if any
+                                if (Object.keys(stepEnvVars).length > 0) {
+                                    console.log('[STEP ENV]');
+                                    for (const [key, value] of Object.entries(stepEnvVars)) {
+                                        // Mask values that look like secrets (contain TOKEN, SECRET, PASSWORD, KEY, etc.)
+                                        const isSecretLike = /(TOKEN|SECRET|PASSWORD|KEY|AUTH|CREDENTIAL)/i.test(key);
+                                        const displayValue = isSecretLike ? '***' : value;
+                                        console.log(`${key} = "${displayValue}"`);
+                                    }
+                                }
+                                
+                                spinner.start();
+                                
                                 const result = await executeCommand(resolvedCommand, stepWorkingDir, false, envVars, context.miseVersion);
                                 
                                 // Stop spinner first

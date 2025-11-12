@@ -22,6 +22,25 @@ export async function askUserForInput(prompt: string, placeholder?: string): Pro
     return answer.value.trim();
 }
 
+export async function askUserForSecret(prompt: string, placeholder?: string): Promise<string> {
+    // Add blank line before prompt for better readability
+    console.log();
+    
+    const answer = await inquirer.prompt([
+        {
+            type: 'password',
+            name: 'value',
+            message: prompt,
+            mask: '*', // Mask the input with asterisks
+        }
+    ]);
+    
+    // Clear the prompt line (just the input line, not the blank line before it)
+    process.stdout.write('\x1b[1A\x1b[2K'); // Move up and clear line
+    
+    return answer.value.trim();
+}
+
 export function askUserConfirmation(question: string): Promise<'yes' | 'no' | 'all' | 'quit' | 'skip'> {
     return new Promise((resolve) => {
         // Use ANSI 256-color code for orange (208) with bold
